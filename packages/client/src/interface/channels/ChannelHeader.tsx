@@ -240,7 +240,7 @@ export function ChannelHeader(props: Props) {
             height: "40px",
             width: "240px",
             paddingInline: "16px",
-            borderRadius: "var(--borderRadius-full)",
+            borderRadius: "var(--borderRadius-md)",
             background: "var(--md-sys-color-surface-container-high)",
           })}
           placeholder="Search messages..."

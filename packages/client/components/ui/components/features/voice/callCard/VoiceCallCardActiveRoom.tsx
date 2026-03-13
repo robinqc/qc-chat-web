@@ -1,8 +1,21 @@
-import { createEffect, Match, Show, Switch } from "solid-js";
+import { Key } from "@solid-primitives/keyed";
+import {
+  Accessor,
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  Match,
+  on,
+  Show,
+  Switch,
+  useContext,
+} from "solid-js";
 import {
   isTrackReference,
   TrackLoop,
   TrackReference,
+  TrackReferenceOrPlaceholder,
   useEnsureParticipant,
   useIsMuted,
   useIsSpeaking,
@@ -12,14 +25,17 @@ import {
   VideoTrack,
 } from "solid-livekit-components";
 
+import { getTrackReferenceId } from "@livekit/components-core";
 import { Track } from "livekit-client";
 import { cva } from "styled-system/css";
 import { styled } from "styled-system/jsx";
 
 import { UserContextMenu } from "@revolt/app";
+import { ContextMenu, ContextMenuButton } from "@revolt/app/menus/ContextMenu";
 import { useUser } from "@revolt/markdown/users";
 import { InRoom } from "@revolt/rtc";
-import { Avatar } from "@revolt/ui/components/design";
+import { useState } from "@revolt/state";
+import { Avatar, Button, Slider, Text } from "@revolt/ui/components/design";
 import { OverflowingText } from "@revolt/ui/components/utils";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
@@ -27,6 +43,36 @@ import { VoiceStatefulUserIcons } from "../VoiceStatefulUserIcons";
 
 import { VoiceCallCardActions } from "./VoiceCallCardActions";
 import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
+
+// ── Screen share watch context ────────────────────────────────────────────────
+
+type ScreenShareWatchContextValue = {
+  /** Set of track reference IDs currently being watched */
+  watchedIds: Accessor<Set<string>>;
+  /** Track reference ID of the focused (expanded) stream, or null */
+  focusedId: Accessor<string | null>;
+  /** Start watching a stream */
+  watchStream: (id: string) => void;
+  /** Stop watching a stream */
+  unwatchStream: (id: string) => void;
+  /** Stop watching all streams */
+  unwatchAll: () => void;
+  /** Set which stream is focused (expanded), or null to unfocus */
+  focusStream: (id: string | null) => void;
+};
+
+const screenShareWatchContext =
+  createContext<ScreenShareWatchContextValue | null>(null);
+
+/**
+ * Hook to consume screen share watch context.
+ * Returns null when not inside VoiceCallCardActiveRoom (e.g. PiP).
+ */
+export function useScreenShareWatch() {
+  return useContext(screenShareWatchContext);
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 interface VoiceCallCardActiveRoomProps {
   /** When provided, a Minimize button is shown in the action bar */
@@ -37,17 +83,65 @@ interface VoiceCallCardActiveRoomProps {
  * Call card (active)
  */
 export function VoiceCallCardActiveRoom(props: VoiceCallCardActiveRoomProps) {
-  return (
-    <View>
-      <Call>
-        <InRoom>
-          <Participants />
-        </InRoom>
-      </Call>
+  const [watchedIds, setWatchedIds] = createSignal<Set<string>>(new Set());
+  const [focusedId, setFocusedId] = createSignal<string | null>(null);
 
-      <VoiceCallCardStatus />
-      <VoiceCallCardActions size="sm" onMinimize={props.onMinimize} />
-    </View>
+  function watchStream(id: string) {
+    setWatchedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    // Auto-focus the first watched stream
+    if (focusedId() === null) {
+      setFocusedId(id);
+    }
+  }
+
+  function unwatchStream(id: string) {
+    setWatchedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (focusedId() === id) {
+      // Focus another watched stream if available
+      const remaining = [...watchedIds()].filter((wid) => wid !== id);
+      setFocusedId(remaining.length > 0 ? remaining[0] : null);
+    }
+  }
+
+  function unwatchAll() {
+    setWatchedIds(new Set<string>());
+    setFocusedId(null);
+  }
+
+  function focusStream(id: string | null) {
+    setFocusedId(id);
+  }
+
+  const contextValue: ScreenShareWatchContextValue = {
+    watchedIds,
+    focusedId,
+    watchStream,
+    unwatchStream,
+    unwatchAll,
+    focusStream,
+  };
+
+  return (
+    <screenShareWatchContext.Provider value={contextValue}>
+      <View>
+        <Call>
+          <InRoom>
+            <Participants />
+          </InRoom>
+        </Call>
+
+        <VoiceCallCardStatus />
+        <VoiceCallCardActions size="sm" onMinimize={props.onMinimize} />
+      </View>
+    </screenShareWatchContext.Provider>
   );
 }
 
@@ -69,14 +163,15 @@ const Call = styled("div", {
   base: {
     flexGrow: 1,
     minHeight: 0,
-    overflowY: "scroll",
+    overflowY: "auto",
   },
 });
 
-/**
- * Show a grid of participants
- */
+// ── Participants layout ───────────────────────────────────────────────────────
+
 function Participants() {
+  const ctx = useContext(screenShareWatchContext)!;
+
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -85,15 +180,84 @@ function Participants() {
     { onlySubscribed: false },
   );
 
+  // Separate screen share tracks from camera/placeholder tracks
+  const screenShareTracks = createMemo(() =>
+    tracks().filter((t) => t.source === Track.Source.ScreenShare),
+  );
+
+  const otherTracks = createMemo(() =>
+    tracks().filter((t) => t.source !== Track.Source.ScreenShare),
+  );
+
+  // Auto-unwatch when a screen share track disappears
+  createEffect(
+    on(
+      () => new Set(screenShareTracks().map((t) => getTrackReferenceId(t))),
+      (currentIds) => {
+        const watched = ctx.watchedIds();
+        for (const id of watched) {
+          if (!currentIds.has(id)) {
+            ctx.unwatchStream(id);
+          }
+        }
+      },
+    ),
+  );
+
+  // Find the focused track reference
+  const focusedTrack = createMemo(() => {
+    const fid = ctx.focusedId();
+    if (!fid) return null;
+    return (
+      screenShareTracks().find((t) => getTrackReferenceId(t) === fid) ?? null
+    );
+  });
+
+  // Non-focused screen share tracks (for the grid or thumbnail strip)
+  const nonFocusedScreenShares = createMemo(() => {
+    const fid = ctx.focusedId();
+    return screenShareTracks().filter((t) => getTrackReferenceId(t) !== fid);
+  });
+
   return (
-    <Grid>
-      <TrackLoop tracks={tracks}>{() => <ParticipantTile />}</TrackLoop>
-      {/* <div class={tile()} />
-      <div class={tile()} />
-      <div class={tile()} />
-      <div class={tile()} />
-      <div class={tile()} /> */}
-    </Grid>
+    <Show
+      when={focusedTrack()}
+      fallback={
+        // Mode A: no focused stream — normal grid
+        <Grid>
+          <TrackLoop tracks={tracks}>{() => <ParticipantTile />}</TrackLoop>
+        </Grid>
+      }
+    >
+      {(focused) => (
+        // Mode B: a stream is focused — focused layout.
+        // The focused tile is keyed by its track ID so that switching focus
+        // remounts the VideoTrack (needed because VideoTrack destructures
+        // props and loses reactivity on trackRef changes).
+        <FocusedLayout>
+          <FocusedStreamArea>
+            <Key each={[focused()]} by={(item) => getTrackReferenceId(item)}>
+              {(trackRef) => (
+                <ScreenshareTile trackRef={trackRef()} isFocused />
+              )}
+            </Key>
+          </FocusedStreamArea>
+          <ThumbnailStrip>
+            <Key
+              each={nonFocusedScreenShares()}
+              by={(item) => getTrackReferenceId(item)}
+            >
+              {(trackRef) => (
+                <ScreenshareTile trackRef={trackRef()} isThumbnail />
+              )}
+            </Key>
+            <Key each={otherTracks()} by={(item) => getTrackReferenceId(item)}>
+              {(trackRef) => <UserTile trackRef={trackRef()} isThumbnail />}
+            </Key>
+          </ThumbnailStrip>
+        </FocusedLayout>
+      )}
+    </Show>
   );
 }
 
@@ -106,9 +270,41 @@ const Grid = styled("div", {
   },
 });
 
-/**
- * Individual participant tile
- */
+const FocusedLayout = styled("div", {
+  base: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    gap: "var(--gap-md)",
+    padding: "var(--gap-md)",
+  },
+});
+
+const FocusedStreamArea = styled("div", {
+  base: {
+    flexGrow: 1,
+    minHeight: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+const ThumbnailStrip = styled("div", {
+  base: {
+    flexShrink: 0,
+    height: "140px",
+    display: "flex",
+    flexDirection: "row",
+    gap: "var(--gap-md)",
+    overflowX: "auto",
+    overflowY: "hidden",
+    paddingBottom: "var(--gap-sm)",
+  },
+});
+
+// ── Individual participant tile ───────────────────────────────────────────────
+
 function ParticipantTile() {
   const track = useTrackRefContext();
 
@@ -121,12 +317,17 @@ function ParticipantTile() {
   );
 }
 
-/**
- * Shown when the track source is a camera or placeholder
- */
-function UserTile() {
-  const participant = useEnsureParticipant();
-  const track = useMaybeTrackRefContext();
+// ── UserTile ──────────────────────────────────────────────────────────────────
+
+function UserTile(props: {
+  trackRef?: TrackReferenceOrPlaceholder;
+  isThumbnail?: boolean;
+}) {
+  // Use provided trackRef or fall back to context
+  const contextTrack = useMaybeTrackRefContext();
+  const track = () => props.trackRef ?? contextTrack;
+
+  const participant = props.trackRef?.participant ?? useEnsureParticipant();
 
   const isMuted = useIsMuted({
     participant,
@@ -145,7 +346,8 @@ function UserTile() {
   let videoRef: HTMLDivElement | undefined;
 
   function toggleFullscreen() {
-    if (!videoRef || !isTrackReference(track) || isVideoMuted()) return;
+    const t = track();
+    if (!videoRef || !isTrackReference(t) || isVideoMuted()) return;
     if (!document.fullscreenElement) {
       videoRef.requestFullscreen();
     } else {
@@ -164,6 +366,7 @@ function UserTile() {
       ref={videoRef}
       class={tile({
         speaking: isSpeaking(),
+        thumbnail: props.isThumbnail,
       })}
       onClick={toggleFullscreen}
       style={{ cursor: "pointer" }}
@@ -183,13 +386,13 @@ function UserTile() {
             <Avatar
               src={user().avatar}
               fallback={user().username}
-              size={48}
+              size={props.isThumbnail ? 32 : 48}
               interactive={false}
             />
           </AvatarOnly>
         }
       >
-        <Match when={isTrackReference(track) && !isVideoMuted()}>
+        <Match when={isTrackReference(track()) && !isVideoMuted()}>
           <VideoTrack
             style={{
               "grid-area": "1/1",
@@ -197,7 +400,7 @@ function UserTile() {
               width: "100%",
               height: "100%",
             }}
-            trackRef={track as TrackReference}
+            trackRef={track() as TrackReference}
             manageSubscription={true}
           />
         </Match>
@@ -210,7 +413,7 @@ function UserTile() {
             userId={participant.identity}
             muted={isMuted()}
           />
-          <Show when={isTrackReference(track) && !isVideoMuted()}>
+          <Show when={isTrackReference(track()) && !isVideoMuted()}>
             <Symbol size={18}>fullscreen</Symbol>
           </Show>
         </OverlayInner>
@@ -227,61 +430,203 @@ const AvatarOnly = styled("div", {
   },
 });
 
-/**
- * Shown when the track source is a screenshare
- */
-function ScreenshareTile() {
-  const participant = useEnsureParticipant();
-  const track = useMaybeTrackRefContext();
-  const user = useUser(participant.identity);
+// ── ScreenshareTile ───────────────────────────────────────────────────────────
 
-  const isMuted = useIsMuted({
-    participant,
-    source: Track.Source.ScreenShareAudio,
+function ScreenshareTile(props: {
+  trackRef?: TrackReferenceOrPlaceholder;
+  isFocused?: boolean;
+  isThumbnail?: boolean;
+}) {
+  const contextTrack = useMaybeTrackRefContext();
+  const track = () => props.trackRef ?? contextTrack;
+
+  // Derive participant reactively from the track reference.
+  // When used inside TrackLoop (grid mode), contextTrack provides the participant.
+  // When used with explicit trackRef (focused/thumbnail mode), props provides it.
+  const participant = () => track()?.participant;
+
+  const userId = createMemo(() => participant()?.identity ?? "");
+  const userInfo = useUser(userId);
+  const ctx = useContext(screenShareWatchContext)!;
+
+  const trackId = createMemo(() => {
+    const t = track();
+    return t ? getTrackReferenceId(t) : "";
+  });
+
+  const isWatched = createMemo(() => ctx.watchedIds().has(trackId()));
+  const isFocusedHere = () => props.isFocused === true;
+
+  const isMuted = createMemo(() => {
+    const p = participant();
+    if (!p) return true;
+    return p
+      .getTrackPublications()
+      .every(
+        (pub) => pub.source !== Track.Source.ScreenShareAudio || pub.isMuted,
+      );
   });
 
   let videoRef: HTMLDivElement | undefined;
 
-  const toggleFullscreen = () => {
+  function handleClick() {
+    const id = trackId();
+    if (isFocusedHere()) {
+      // Clicking the focused (big) stream unfocuses it back to a thumbnail
+      ctx.focusStream(null);
+      return;
+    }
+    // Clicking a non-focused tile: auto-watch if needed, then focus it
+    if (!isWatched()) {
+      ctx.watchStream(id);
+    }
+    ctx.focusStream(id);
+  }
+
+  function handleWatchClick(e: MouseEvent) {
+    e.stopPropagation();
+    ctx.watchStream(trackId());
+  }
+
+  function handleUnwatchClick(e: MouseEvent) {
+    e.stopPropagation();
+    ctx.unwatchStream(trackId());
+  }
+
+  function requestFullscreen(e: MouseEvent) {
+    e.stopPropagation();
     if (!videoRef) return;
-    if (!isTrackReference(track)) return;
     if (!document.fullscreenElement) {
       videoRef.requestFullscreen();
     } else {
       document.exitFullscreen();
     }
-  };
+  }
 
   return (
     <div
       ref={videoRef}
-      class={tile() + " group"}
-      onClick={toggleFullscreen}
-      style={{ cursor: "pointer" }}
+      class={
+        tile({
+          focused: isFocusedHere(),
+          thumbnail: props.isThumbnail,
+        }) + " group"
+      }
+      onClick={handleClick}
+      style={{
+        cursor:
+          isWatched() || props.isThumbnail || isFocusedHere()
+            ? "pointer"
+            : "default",
+      }}
+      use:floating={{
+        contextMenu: () => <ScreenShareContextMenu userId={userId()} />,
+      }}
     >
-      <VideoTrack
-        style={{
-          "grid-area": "1/1",
-          "object-fit": "contain",
-          width: "100%",
-          height: "100%",
-        }}
-        trackRef={track as TrackReference}
-        manageSubscription={true}
-      />
+      <Show
+        when={isWatched()}
+        fallback={
+          // Unwatched state: show avatar + "Watch Stream" button
+          <UnwatchedContent>
+            <Avatar
+              src={userInfo().avatar}
+              fallback={userInfo().username}
+              size={props.isThumbnail ? 24 : 40}
+              interactive={false}
+            />
+            <UnwatchedLabel>
+              <OverflowingText>{userInfo().username}'s screen</OverflowingText>
+            </UnwatchedLabel>
+            <Button
+              size="sm"
+              variant="filled"
+              onPress={() => ctx.watchStream(trackId())}
+            >
+              <Symbol size={16}>visibility</Symbol>
+              Watch Stream
+            </Button>
+          </UnwatchedContent>
+        }
+      >
+        {/* Watched state: show the video */}
+        <Show when={isTrackReference(track())}>
+          <VideoTrack
+            style={{
+              "grid-area": "1/1",
+              "object-fit": "contain",
+              width: "100%",
+              height: "100%",
+            }}
+            trackRef={track() as TrackReference}
+            manageSubscription={true}
+          />
+        </Show>
 
-      <Overlay showOnHover>
-        <OverlayInner>
-          <OverflowingText>{user().username}</OverflowingText>
-          <Show when={isMuted()}>
-            <Symbol size={18}>no_sound</Symbol>
-          </Show>
-          <Symbol size={18}>fullscreen</Symbol>
-        </OverlayInner>
-      </Overlay>
+        <Overlay showOnHover>
+          <OverlayInner>
+            <OverflowingText>{userInfo().username}</OverflowingText>
+            <OverlayActions>
+              <Show when={isMuted()}>
+                <Symbol size={18}>no_sound</Symbol>
+              </Show>
+              <Show when={isFocusedHere()}>
+                <OverlayIconButton
+                  onClick={handleUnwatchClick}
+                  title="Stop Watching"
+                >
+                  <Symbol size={18}>visibility_off</Symbol>
+                </OverlayIconButton>
+                <OverlayIconButton
+                  onClick={requestFullscreen}
+                  title="Fullscreen"
+                >
+                  <Symbol size={18}>fullscreen</Symbol>
+                </OverlayIconButton>
+              </Show>
+              <Show when={!isFocusedHere() && isWatched()}>
+                <Symbol size={18}>open_in_full</Symbol>
+              </Show>
+            </OverlayActions>
+          </OverlayInner>
+        </Overlay>
+      </Show>
     </div>
   );
 }
+
+/**
+ * Context menu shown on right-click of a screen share tile.
+ * Contains a volume slider for the screen share audio.
+ */
+function ScreenShareContextMenu(props: { userId: string }) {
+  const state = useState();
+
+  return (
+    <ContextMenu>
+      <ContextMenuButton
+        onMouseDown={(e: MouseEvent) => e.stopImmediatePropagation()}
+        onClick={(e: MouseEvent) => e.stopImmediatePropagation()}
+      >
+        <Text class="label">Stream Volume</Text>
+        <Slider
+          min={0}
+          max={3}
+          step={0.1}
+          value={state.voice.getUserScreenShareVolume(props.userId)}
+          onInput={(event: { currentTarget: { value: number } }) =>
+            state.voice.setUserScreenShareVolume(
+              props.userId,
+              event.currentTarget.value,
+            )
+          }
+          labelFormatter={(label: number) => (label * 100).toFixed(0) + "%"}
+        />
+      </ContextMenuButton>
+    </ContextMenu>
+  );
+}
+
+// ── Styled components ─────────────────────────────────────────────────────────
 
 const tile = cva({
   base: {
@@ -303,6 +648,21 @@ const tile = cva({
     speaking: {
       true: {
         outlineColor: "var(--md-sys-color-primary)",
+      },
+    },
+    focused: {
+      true: {
+        width: "100%",
+        height: "100%",
+        aspectRatio: "auto",
+      },
+    },
+    thumbnail: {
+      true: {
+        height: "100%",
+        width: "auto",
+        aspectRatio: "16/9",
+        flexShrink: 0,
       },
     },
   },
@@ -345,6 +705,7 @@ const Overlay = styled("div", {
 const OverlayInner = styled("div", {
   base: {
     minWidth: 0,
+    width: "100%",
 
     display: "flex",
     alignItems: "center",
@@ -354,5 +715,51 @@ const OverlayInner = styled("div", {
     _first: {
       flexGrow: 1,
     },
+  },
+});
+
+const OverlayActions = styled("div", {
+  base: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--gap-sm)",
+    flexShrink: 0,
+  },
+});
+
+const OverlayIconButton = styled("button", {
+  base: {
+    all: "unset",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4px",
+    borderRadius: "var(--borderRadius-md)",
+    transition: "background 0.15s ease",
+
+    _hover: {
+      background: "rgba(255, 255, 255, 0.2)",
+    },
+  },
+});
+
+const UnwatchedContent = styled("div", {
+  base: {
+    gridArea: "1/1",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "var(--gap-md)",
+    padding: "var(--gap-lg)",
+  },
+});
+
+const UnwatchedLabel = styled("div", {
+  base: {
+    fontSize: "0.85rem",
+    opacity: 0.8,
+    textAlign: "center",
   },
 });
