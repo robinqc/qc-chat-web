@@ -14,7 +14,9 @@ export const Header = styled("div", {
     flex: "0 auto",
     display: "flex",
     flexShrink: 0,
-    padding: "0 16px",
+    paddingTop: "0",
+    paddingBottom: "0",
+    paddingLeft: "10px",
     alignItems: "center",
     fontWeight: 600,
     userSelect: "none",
@@ -59,6 +61,13 @@ export const Header = styled("div", {
     bottomBorder: {
       true: {
         borderBottom:
+          "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
+      },
+      false: {},
+    },
+    topBorder: {
+      true: {
+        borderTop:
           "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
       },
       false: {},

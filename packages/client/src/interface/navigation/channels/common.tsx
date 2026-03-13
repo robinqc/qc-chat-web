@@ -9,7 +9,7 @@ export const SidebarBase = styled("div", {
     flexShrink: 0,
     flexDirection: "column",
     overflow: "hidden",
-    // borderRadius: "var(--borderRadius-lg)",
+    borderTopLeftRadius: "var(--borderRadius-md)",
     // margin: "var(--gap-md) var(--gap-md) var(--gap-md) 0",
     width: "var(--layout-width-channel-sidebar)",
 
@@ -18,7 +18,10 @@ export const SidebarBase = styled("div", {
     background: "var(--md-sys-color-surface-container-low)",
     borderRight:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
-
+      borderLeft:
+      "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
+    borderTop:
+      "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
     "& a": {
       textDecoration: "none",
     },

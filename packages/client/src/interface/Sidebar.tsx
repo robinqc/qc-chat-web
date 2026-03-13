@@ -14,6 +14,7 @@ import { useState } from "@revolt/state";
 import { LAYOUT_SECTIONS } from "@revolt/state/stores/Layout";
 
 import { HomeSidebar, ServerList, ServerSidebar } from "./navigation";
+import { css } from "styled-system/css";
 
 /**
  * Left-most channel navigation sidebar
@@ -59,12 +60,13 @@ export const Sidebar = (props: {
           !location.pathname.startsWith("/discover")
         }
       >
-        <Switch fallback={<Home />}>
-          <Match when={params.server}>
-            <Server />
-          </Match>
-        </Switch>
+            <Switch fallback={<Home />}>
+              <Match when={params.server}>
+                <Server />
+              </Match>
+            </Switch>
       </Show>
+      
     </div>
   );
 };

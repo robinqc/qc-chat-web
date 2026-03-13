@@ -235,15 +235,22 @@ export function ChannelHeader(props: Props) {
       </Show>
 
       <Show when={searchValue() !== null}>
-        <input
+        <div class={css({
+          width: "calc(var(--layout-width-channel-sidebar))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        })}>
+          <input
           class={css({
             height: "32px",
-            width: "calc(var(--layout-width-channel-sidebar) - 30px)",
+            width: "calc(var(--layout-width-channel-sidebar) - 10px)",
             paddingInline: "12px",
             fontSize: "14px",
-            borderRadius: "var(--borderRadius-md)",
+            borderRadius: "var(--borderRadius-sm)",
             background: "var(--md-sys-color-surface-container-high)",
             marginRight: "0",
+            border: "1px solid var(--md-sys-color-outline-variant)"
           })}
           placeholder="Search messages..."
           value={searchValue()!}
@@ -258,6 +265,7 @@ export function ChannelHeader(props: Props) {
                 })
           }
         />
+        </div>
       </Show>
     </>
   );

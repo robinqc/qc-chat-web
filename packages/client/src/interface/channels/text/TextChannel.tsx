@@ -165,7 +165,7 @@ export function TextChannel(props: ChannelPageProps) {
 
   return (
     <>
-      <Header bottomBorder>
+      <Header bottomBorder topBorder>
         <ChannelHeader
           channel={props.channel}
           sidebarState={sidebarState}
