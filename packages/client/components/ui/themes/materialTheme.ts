@@ -175,15 +175,18 @@ function generateMaterialYouScheme(
       break;
   }
 
+  // Override container colors with muted surface tones for a Discord-like look.
+  // Instead of the saturated primary/secondary tints, use subtle surface
+  // elevations so selected/highlighted states are understated.
   return {
     primary: hexFromArgb(scheme.primary),
     "on-primary": hexFromArgb(scheme.onPrimary),
-    "primary-container": hexFromArgb(scheme.primaryContainer),
-    "on-primary-container": hexFromArgb(scheme.onPrimaryContainer),
+    "primary-container": hexFromArgb(scheme.surfaceContainerHigh),
+    "on-primary-container": hexFromArgb(scheme.onSurface),
     secondary: hexFromArgb(scheme.secondary),
     "on-secondary": hexFromArgb(scheme.onSecondary),
-    "secondary-container": hexFromArgb(scheme.secondaryContainer),
-    "on-secondary-container": hexFromArgb(scheme.onSecondaryContainer),
+    "secondary-container": hexFromArgb(scheme.surfaceContainerHigh),
+    "on-secondary-container": hexFromArgb(scheme.onSurface),
     tertiary: hexFromArgb(scheme.tertiary),
     "on-tertiary": hexFromArgb(scheme.onTertiary),
     "tertiary-container": hexFromArgb(scheme.tertiaryContainer),

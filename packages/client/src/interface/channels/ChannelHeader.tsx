@@ -237,11 +237,13 @@ export function ChannelHeader(props: Props) {
       <Show when={searchValue() !== null}>
         <input
           class={css({
-            height: "40px",
-            width: "240px",
-            paddingInline: "16px",
+            height: "32px",
+            width: "calc(var(--layout-width-channel-sidebar) - 30px)",
+            paddingInline: "12px",
+            fontSize: "14px",
             borderRadius: "var(--borderRadius-md)",
             background: "var(--md-sys-color-surface-container-high)",
+            marginRight: "0",
           })}
           placeholder="Search messages..."
           value={searchValue()!}

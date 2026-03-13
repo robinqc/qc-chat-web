@@ -139,12 +139,20 @@ const Base = styled("a", {
         "--color": "var(--md-sys-color-on-primary)",
       },
       tonal: {
-        background: "var(--md-sys-color-secondary-container)",
+        background: "transparent",
         "--color": "var(--md-sys-color-on-secondary-container)",
+
+        "&:hover": {
+          background: "var(--md-sys-color-surface-container-high)",
+        },
       },
       tertiary: {
-        background: "var(--md-sys-color-tertiary-container)",
+        background: "transparent",
         "--color": "var(--md-sys-color-on-tertiary-container)",
+
+        "&:hover": {
+          background: "var(--md-sys-color-surface-container-high)",
+        },
       },
     },
     isLink: {

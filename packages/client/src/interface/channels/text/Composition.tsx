@@ -379,10 +379,9 @@ export function MessageComposition(props: Props) {
         actionsAppend={
           <Show when={state.settings.getValue("appearance:show_send_button")}>
             <IconButton
-              _compositionSendMessage
               size="sm"
               variant={canSend() ? "filled" : "tonal"}
-              shape="square"
+              shape="round"
               isDisabled={!canSend()}
               onPress={sendMessage}
             >

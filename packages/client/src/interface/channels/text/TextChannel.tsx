@@ -319,7 +319,8 @@ const sidebar = cva({
     flexShrink: 0,
     width: "var(--layout-width-channel-sidebar)",
     // margin: "var(--gap-md)",
-    borderRadius: "var(--borderRadius-lg)",
+    borderLeft:
+      "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
     // color: "var(--colours-sidebar-channels-foreground)",
     // background: "var(--colours-sidebar-channels-background)",
   },

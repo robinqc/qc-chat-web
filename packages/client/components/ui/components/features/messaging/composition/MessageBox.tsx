@@ -222,9 +222,22 @@ export function MessageBox(props: Props) {
           </Match>
         </Switch>
       </Base>
-      <Show when={props.sendingAllowed}>{props.actionsAppend}</Show>
+      <Show when={props.sendingAllowed}>
+        <AppendContainer>{props.actionsAppend}</AppendContainer>
+      </Show>
     </Parent>
   );
 }
 
 MessageBox.InlineIcon = InlineIcon;
+
+/**
+ * Container for appended actions (e.g. send button), pinned to bottom
+ */
+const AppendContainer = styled("div", {
+  base: {
+    display: "flex",
+    alignItems: "flex-end",
+    paddingBottom: "var(--gap-sm)",
+  },
+});
