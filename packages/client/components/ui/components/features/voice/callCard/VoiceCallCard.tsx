@@ -40,7 +40,24 @@ type VoiceLayoutState =
 /** Payload passed by VoiceChannelCallCardMount when the user is on the voice channel */
 type ExpandPayload = { channel: Channel };
 
-/** Context value: update layout state + minimise action */
+// ── Screen share watch state (shared across PiP and expanded views) ──────────
+
+export type ScreenShareWatchContextValue = {
+  /** Set of track reference IDs currently being watched */
+  watchedIds: Accessor<Set<string>>;
+  /** Track reference ID of the focused (expanded) stream, or null */
+  focusedId: Accessor<string | null>;
+  /** Start watching a stream */
+  watchStream: (id: string) => void;
+  /** Stop watching a stream */
+  unwatchStream: (id: string) => void;
+  /** Stop watching all streams */
+  unwatchAll: () => void;
+  /** Set which stream is focused (expanded), or null to unfocus */
+  focusStream: (id: string | null) => void;
+};
+
+/** Context value: update layout state + minimise action + screen share watch */
 type CallCardContextValue = {
   /** Called by VoiceChannelCallCardMount to expand (or clear) the room view */
   updateState: (payload?: ExpandPayload) => void;
@@ -48,6 +65,8 @@ type CallCardContextValue = {
   minimize: () => void;
   /** Whether the room is currently minimised by the user */
   minimized: Accessor<boolean>;
+  /** Screen share watch/focus state — accessible from both PiP and expanded */
+  screenShareWatch: ScreenShareWatchContextValue;
 };
 
 const callCardContext = createContext<CallCardContextValue>(null!);
@@ -74,6 +93,16 @@ export function useVoiceExpanded(
 }
 
 /**
+ * Hook to consume screen share watch context.
+ * Returns the watch state from the top-level VoiceCallCardContext, or null if
+ * not inside one (should never happen in practice).
+ */
+export function useScreenShareWatch(): ScreenShareWatchContextValue | null {
+  const ctx = useContext(callCardContext);
+  return ctx?.screenShareWatch ?? null;
+}
+
+/**
  * Provides voice layout state to the entire app.
  * Renders the PiP floating card via a Portal when in pip mode.
  */
@@ -87,6 +116,53 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
 
   /** Explicit user-initiated minimise flag */
   const [minimized, setMinimized] = createSignal(false);
+
+  // ── Screen share watch state ────────────────────────────────────────────────
+  const [watchedIds, setWatchedIds] = createSignal<Set<string>>(new Set());
+  const [focusedId, setFocusedId] = createSignal<string | null>(null);
+
+  function watchStream(id: string) {
+    setWatchedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    // Auto-focus the first watched stream
+    if (focusedId() === null) {
+      setFocusedId(id);
+    }
+  }
+
+  function unwatchStream(id: string) {
+    setWatchedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (focusedId() === id) {
+      // Focus another watched stream if available
+      const remaining = [...watchedIds()].filter((wid) => wid !== id);
+      setFocusedId(remaining.length > 0 ? remaining[0] : null);
+    }
+  }
+
+  function unwatchAll() {
+    setWatchedIds(new Set<string>());
+    setFocusedId(null);
+  }
+
+  function focusStream(id: string | null) {
+    setFocusedId(id);
+  }
+
+  const screenShareWatch: ScreenShareWatchContextValue = {
+    watchedIds,
+    focusedId,
+    watchStream,
+    unwatchStream,
+    unwatchAll,
+    focusStream,
+  };
 
   // ── PiP drag state ─────────────────────────────────────────────────────────
   const [moving, setMoving] = createSignal<boolean>();
@@ -198,6 +274,7 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
     updateState: handleMountUpdate,
     minimize,
     minimized,
+    screenShareWatch,
   };
 
   return (

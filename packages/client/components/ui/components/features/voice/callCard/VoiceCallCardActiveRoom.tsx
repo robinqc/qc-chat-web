@@ -1,16 +1,5 @@
 import { Key } from "@solid-primitives/keyed";
-import {
-  Accessor,
-  createContext,
-  createEffect,
-  createMemo,
-  createSignal,
-  Match,
-  on,
-  Show,
-  Switch,
-  useContext,
-} from "solid-js";
+import { createEffect, createMemo, Match, on, Show, Switch } from "solid-js";
 import {
   isTrackReference,
   TrackLoop,
@@ -41,36 +30,9 @@ import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
 import { VoiceStatefulUserIcons } from "../VoiceStatefulUserIcons";
 
+import { useScreenShareWatch } from "./VoiceCallCard";
 import { VoiceCallCardActions } from "./VoiceCallCardActions";
 import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
-
-// ── Screen share watch context ────────────────────────────────────────────────
-
-type ScreenShareWatchContextValue = {
-  /** Set of track reference IDs currently being watched */
-  watchedIds: Accessor<Set<string>>;
-  /** Track reference ID of the focused (expanded) stream, or null */
-  focusedId: Accessor<string | null>;
-  /** Start watching a stream */
-  watchStream: (id: string) => void;
-  /** Stop watching a stream */
-  unwatchStream: (id: string) => void;
-  /** Stop watching all streams */
-  unwatchAll: () => void;
-  /** Set which stream is focused (expanded), or null to unfocus */
-  focusStream: (id: string | null) => void;
-};
-
-const screenShareWatchContext =
-  createContext<ScreenShareWatchContextValue | null>(null);
-
-/**
- * Hook to consume screen share watch context.
- * Returns null when not inside VoiceCallCardActiveRoom (e.g. PiP).
- */
-export function useScreenShareWatch() {
-  return useContext(screenShareWatchContext);
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -81,67 +43,22 @@ interface VoiceCallCardActiveRoomProps {
 
 /**
  * Call card (active)
+ *
+ * Screen share watch state (watchedIds, focusedId, etc.) is owned by the
+ * top-level VoiceCallCardContext and consumed here via useScreenShareWatch().
  */
 export function VoiceCallCardActiveRoom(props: VoiceCallCardActiveRoomProps) {
-  const [watchedIds, setWatchedIds] = createSignal<Set<string>>(new Set());
-  const [focusedId, setFocusedId] = createSignal<string | null>(null);
-
-  function watchStream(id: string) {
-    setWatchedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    // Auto-focus the first watched stream
-    if (focusedId() === null) {
-      setFocusedId(id);
-    }
-  }
-
-  function unwatchStream(id: string) {
-    setWatchedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    if (focusedId() === id) {
-      // Focus another watched stream if available
-      const remaining = [...watchedIds()].filter((wid) => wid !== id);
-      setFocusedId(remaining.length > 0 ? remaining[0] : null);
-    }
-  }
-
-  function unwatchAll() {
-    setWatchedIds(new Set<string>());
-    setFocusedId(null);
-  }
-
-  function focusStream(id: string | null) {
-    setFocusedId(id);
-  }
-
-  const contextValue: ScreenShareWatchContextValue = {
-    watchedIds,
-    focusedId,
-    watchStream,
-    unwatchStream,
-    unwatchAll,
-    focusStream,
-  };
-
   return (
-    <screenShareWatchContext.Provider value={contextValue}>
-      <View>
-        <Call>
-          <InRoom>
-            <Participants />
-          </InRoom>
-        </Call>
+    <View>
+      <Call>
+        <InRoom>
+          <Participants />
+        </InRoom>
+      </Call>
 
-        <VoiceCallCardStatus />
-        <VoiceCallCardActions size="sm" onMinimize={props.onMinimize} />
-      </View>
-    </screenShareWatchContext.Provider>
+      <VoiceCallCardStatus />
+      <VoiceCallCardActions size="sm" onMinimize={props.onMinimize} />
+    </View>
   );
 }
 
@@ -170,7 +87,7 @@ const Call = styled("div", {
 // ── Participants layout ───────────────────────────────────────────────────────
 
 function Participants() {
-  const ctx = useContext(screenShareWatchContext)!;
+  const ctx = useScreenShareWatch()!;
 
   const tracks = useTracks(
     [
@@ -447,7 +364,7 @@ function ScreenshareTile(props: {
 
   const userId = createMemo(() => participant()?.identity ?? "");
   const userInfo = useUser(userId);
-  const ctx = useContext(screenShareWatchContext)!;
+  const ctx = useScreenShareWatch()!;
 
   const trackId = createMemo(() => {
     const t = track();

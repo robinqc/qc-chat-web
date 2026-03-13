@@ -8,7 +8,7 @@ import { useVoice } from "@revolt/rtc";
 import { Button, IconButton } from "@revolt/ui/components/design";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
-import { useScreenShareWatch } from "./VoiceCallCardActiveRoom";
+import { useScreenShareWatch } from "./VoiceCallCard";
 
 interface VoiceCallCardActionsProps {
   size: "xs" | "sm";
