@@ -1,8 +1,7 @@
 import {
+  Accessor,
   JSX,
-  Match,
   Show,
-  Switch,
   batch,
   createContext,
   createEffect,
@@ -11,94 +10,122 @@ import {
   onCleanup,
   useContext,
 } from "solid-js";
+
 import { Portal } from "solid-js/web";
 
-import { AutoSizer } from "@dschz/solid-auto-sizer";
 import { Channel } from "stoat.js";
 import { css } from "styled-system/css";
-import { styled } from "styled-system/jsx";
 
 import { InRoom, useVoice } from "@revolt/rtc";
 
-import { VoiceCallCardActiveRoom } from "./VoiceCallCardActiveRoom";
 import { VoiceCallCardPiP } from "./VoiceCallCardPiP";
 import { VoiceCallCardPreview } from "./VoiceCallCardPreview";
+import { VoiceRoomView } from "./VoiceRoomView";
 
-type State =
+/**
+ * Voice layout state:
+ * - "pip": minimised card floating in a screen corner (draggable)
+ * - "expanded": full-space in-flow view occupying the chat area
+ */
+type VoiceLayoutState =
   | {
-      type: "floating";
+      type: "pip";
       corner: "top-left" | "top-right" | "bottom-left" | "bottom-right";
     }
   | {
-      type: "fixed";
-      x: number;
-      y: number;
-      width: number;
+      type: "expanded";
       channel: Channel;
     };
 
-type NewState = { channel: Channel; x: number; y: number; width: number };
+/** Payload passed by VoiceChannelCallCardMount when the user is on the voice channel */
+type ExpandPayload = { channel: Channel };
 
-const callCardContext = createContext<(state?: NewState) => void>(null!);
+/** Context value: update layout state + minimise action */
+type CallCardContextValue = {
+  /** Called by VoiceChannelCallCardMount to expand (or clear) the room view */
+  updateState: (payload?: ExpandPayload) => void;
+  /** Explicitly minimise the room to PiP */
+  minimize: () => void;
+  /** Whether the room is currently minimised by the user */
+  minimized: Accessor<boolean>;
+};
+
+const callCardContext = createContext<CallCardContextValue>(null!);
 
 /**
- * Voice call card context
+ * Returns whether the voice room is currently in expanded (full-space) mode
+ * for the given channel.
+ *
+ * When true, the channel's messages + composition should be hidden since the
+ * voice room is occupying the full chat area.
+ */
+export function useVoiceExpanded(
+  channelId: () => string | undefined,
+): Accessor<boolean> {
+  const ctx = useContext(callCardContext);
+  if (!ctx) return () => false;
+
+  const voice = useVoice();
+  return () => {
+    const activeId = voice.channel()?.id;
+    // Expanded only when: there is an active call on *this* channel AND not minimised
+    return !!activeId && activeId === channelId() && !ctx.minimized();
+  };
+}
+
+/**
+ * Provides voice layout state to the entire app.
+ * Renders the PiP floating card via a Portal when in pip mode.
  */
 export function VoiceCallCardContext(props: { children: JSX.Element }) {
   const voice = useVoice();
 
-  const [state, setState] = createSignal<State>({
-    type: "floating",
+  const [state, setState] = createSignal<VoiceLayoutState>({
+    type: "pip",
     corner: "bottom-right",
   });
 
+  /** Explicit user-initiated minimise flag */
+  const [minimized, setMinimized] = createSignal(false);
+
+  // ── PiP drag state ─────────────────────────────────────────────────────────
   const [moving, setMoving] = createSignal<boolean>();
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
 
-  function position() {
-    const position = state();
+  /** Compute inline style for the floating PiP container */
+  function pipPosition() {
+    const s = state();
+    if (s.type !== "pip") return {};
 
-    switch (position.type) {
-      case "fixed":
-        return {
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          // top: position.y + "px",
-          // left: position.x + "px",
-          width: position.width + "px",
-          height: "40vh",
-        };
-      case "floating":
-        return {
-          "--width": "280px",
-          "--height": "158px",
-          "--padding-x": "32px",
-          "--padding-y": "96px",
-          transform: `translate(${
-            position.corner === "top-left" || position.corner === "bottom-left"
-              ? "calc(var(--padding-x) + var(--offset-x))"
-              : "calc(100vw - var(--padding-x) - var(--width) + var(--offset-x))"
-          }, ${
-            position.corner === "top-left" || position.corner === "top-right"
-              ? "calc(var(--padding-y) + var(--offset-y))"
-              : "calc(100vh - var(--padding-y) - var(--height) + var(--offset-y))"
-          })`,
-          width: "var(--width)",
-          height: "var(--height)",
-        };
-    }
+    return {
+      "--width": "280px",
+      "--height": "158px",
+      "--padding-x": "32px",
+      "--padding-y": "96px",
+      transform: `translate(${
+        s.corner === "top-left" || s.corner === "bottom-left"
+          ? "calc(var(--padding-x) + var(--offset-x))"
+          : "calc(100vw - var(--padding-x) - var(--width) + var(--offset-x))"
+      }, ${
+        s.corner === "top-left" || s.corner === "top-right"
+          ? "calc(var(--padding-y) + var(--offset-y))"
+          : "calc(100vh - var(--padding-y) - var(--height) + var(--offset-y))"
+      })`,
+      width: "var(--width)",
+      height: "var(--height)",
+    };
   }
 
+  // Attach drag listeners while the PiP is being dragged
   createEffect(
-    on(moving, (moving) => {
-      if (moving) {
+    on(moving, (isMoving) => {
+      if (isMoving) {
         const controller = new AbortController();
 
         document.addEventListener(
           "mousemove",
           (event) => {
-            const position = state();
-            if (position.type !== "floating") return controller.abort();
-
+            if (state().type !== "pip") return controller.abort();
             setOffset((pos) => ({
               x: pos.x + event.movementX,
               y: pos.y + event.movementY,
@@ -112,12 +139,10 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
           (event) => {
             batch(() => {
               setMoving(false);
-
               const left = event.clientX < window.outerWidth / 2;
               const top = event.clientY < window.outerHeight / 2;
-
               setState({
-                type: "floating",
+                type: "pip",
                 corner: left
                   ? top
                     ? "top-left"
@@ -136,205 +161,124 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
     }),
   );
 
-  function updateState(state?: NewState) {
-    if (state) {
-      setState({
-        type: "fixed",
-        width: state.width,
-        x: state.x,
-        y: state.y,
-        channel: state.channel,
-      });
+  // ── State transitions ───────────────────────────────────────────────────────
+
+  function updateState(payload?: ExpandPayload) {
+    if (payload && !minimized()) {
+      setState({ type: "expanded", channel: payload.channel });
     } else {
-      setState({
-        type: "floating",
-        corner: "bottom-right",
-      });
+      setState({ type: "pip", corner: "bottom-right" });
     }
   }
 
-  function updateStateWithTransition(state?: NewState) {
-    // no clue if this works
+  function minimize() {
+    setMinimized(true);
+    setState({ type: "pip", corner: "bottom-right" });
+  }
 
+  function updateStateWithTransition(payload?: ExpandPayload) {
     if (!document.startViewTransition) {
-      updateState(state);
+      updateState(payload);
       return;
     }
-
-    document.startViewTransition(() => updateState(state));
+    document.startViewTransition(() => updateState(payload));
   }
 
+  /** Exposed to VoiceChannelCallCardMount — also resets minimized when the
+   *  user navigates back to the voice channel while in PiP. */
+  function handleMountUpdate(payload?: ExpandPayload) {
+    if (payload) {
+      // User navigated to the voice channel: lift the explicit minimise
+      setMinimized(false);
+    }
+    updateStateWithTransition(payload);
+  }
+
+  const contextValue: CallCardContextValue = {
+    updateState: handleMountUpdate,
+    minimize,
+    minimized,
+  };
+
   return (
-    <callCardContext.Provider value={updateStateWithTransition}>
+    <callCardContext.Provider value={contextValue}>
       {props.children}
 
-      <Portal ref={document.getElementById("floating")! as HTMLDivElement}>
-        <div
-          style={{
-            position: "fixed",
-            "z-index": 10,
-            "transition-duration": moving() ? ".2s" : voice.room() && ".3s",
-            "transition-property": "all",
-            "transition-timing-function": moving()
-              ? "cubic-bezier(0, 1.67, 0.85, 0.8)"
-              : "cubic-bezier(1, 0, 0, 1)",
-            ...position(),
-            "pointer-events": "none",
-            cursor: moving() ? "grabbing" : "grab",
-            "--offset-x": `${moving() ? offset().x : 0}px`,
-            "--offset-y": `${moving() ? offset().y : 0}px`,
-          }}
-          // dragging logic for mice
-          onMouseDown={() => {
-            if (state().type === "floating") {
+      {/* PiP card — only rendered when in pip mode and a call is active */}
+      <Show when={state().type === "pip"}>
+        <Portal ref={document.getElementById("floating")! as HTMLDivElement}>
+          <div
+            style={{
+              position: "fixed",
+              "z-index": 10,
+              "transition-duration": moving() ? ".2s" : voice.room() && ".3s",
+              "transition-property": "all",
+              "transition-timing-function": moving()
+                ? "cubic-bezier(0, 1.67, 0.85, 0.8)"
+                : "cubic-bezier(1, 0, 0, 1)",
+              ...pipPosition(),
+              "pointer-events": "none",
+              cursor: moving() ? "grabbing" : "grab",
+              "--offset-x": `${moving() ? offset().x : 0}px`,
+              "--offset-y": `${moving() ? offset().y : 0}px`,
+            }}
+            onMouseDown={() => {
               batch(() => {
                 setMoving(true);
                 setOffset({ x: 0, y: 0 });
               });
-            }
-          }}
-          // dragging logic for touch input
-          // todo
-        >
-          <Switch>
-            <Match when={state().type === "fixed"}>
-              <VoiceCallCard
-                channel={(state() as { channel: Channel }).channel}
-              />
-            </Match>
-            <Match when={state().type === "floating"}>
-              <InRoom>
-                <VoiceCallCardPiP />
-              </InRoom>
-            </Match>
-          </Switch>
-        </div>
-      </Portal>
+            }}
+          >
+            <InRoom>
+              <VoiceCallCardPiP />
+            </InRoom>
+          </div>
+        </Portal>
+      </Show>
     </callCardContext.Provider>
   );
 }
 
 /**
- * 'Marker' to send position information for mounting the floating call card
+ * Placed inside TextChannel for voice-capable channels.
+ * - When the user is on this channel and not minimised: renders the full-space
+ *   VoiceRoomView in normal document flow.
+ * - Otherwise (no active call, or call active in a different channel): renders
+ *   VoiceCallCardPreview so the user can join or switch to this channel's call.
+ * - On cleanup (navigating away): reverts to PiP.
  */
 export function VoiceChannelCallCardMount(props: { channel: Channel }) {
   const voice = useVoice();
-  const [width, setWidth] = createSignal(0);
+  const { updateState, minimize, minimized } = useContext(callCardContext)!;
 
-  const [ref, setRef] = createSignal<HTMLDivElement>();
-  const updateSize = useContext(callCardContext)!;
+  const isActiveChannel = () => voice.channel()?.id === props.channel.id;
 
-  const ongoingCallElsewhere = () =>
-    voice.channel() && voice.channel()?.id !== props.channel.id;
-
+  // Sync layout state whenever the active voice channel or this channel changes
   createEffect(() => {
-    const rect = ref()?.getBoundingClientRect();
-    const w = width();
-
     const activeChannel = voice.channel();
-    const canUpdate = !activeChannel || activeChannel.id === props.channel.id;
+    const isHere = !activeChannel || activeChannel.id === props.channel.id;
 
-    if (rect?.left && w) {
-      if (canUpdate) {
-        updateSize({
-          x: rect.left,
-          y: rect.top,
-          width: w,
-          channel: props.channel,
-        });
-      } else {
-        updateSize();
-      }
+    if (isHere) {
+      updateState({ channel: props.channel });
+    } else {
+      updateState();
     }
   });
 
-  onCleanup(() => updateSize());
+  onCleanup(() => updateState());
 
   return (
-    <div
-      ref={setRef}
-      class={css({ position: "relative", pointerEvents: "none" })}
+    <Show
+      when={isActiveChannel() && !minimized()}
+      fallback={
+        // Shown when: not in this call (no call at all, or call is elsewhere).
+        // VoiceCallCardPreview handles both "Join" and "Switch" labels itself.
+        <div class={css({ padding: "var(--gap-md)", height: "100%" })}>
+          <VoiceCallCardPreview channel={props.channel} />
+        </div>
+      }
     >
-      <div class={css({ position: "absolute", width: "100%" })}>
-        <AutoSizer>
-          {({ width }) => {
-            setWidth(width);
-            return null;
-          }}
-        </AutoSizer>
-      </div>
-
-      <Show when={ongoingCallElsewhere()}>
-        <VoiceCallCard channel={props.channel} />
-      </Show>
-    </div>
+      <VoiceRoomView onMinimize={minimize} />
+    </Show>
   );
 }
-
-/**
- * Call card
- */
-function VoiceCallCard(props: { channel: Channel }) {
-  const voice = useVoice();
-  const inCall = () => voice.channel()?.id === props.channel.id;
-
-  return (
-    <Base>
-      <Card active={inCall()}>
-        <Show
-          when={inCall()}
-          fallback={<VoiceCallCardPreview channel={props.channel} />}
-        >
-          <VoiceCallCardActiveRoom />
-        </Show>
-      </Card>
-    </Base>
-  );
-}
-
-const Base = styled("div", {
-  base: {
-    // todo: temp for Mount
-    top: "var(--gap-md)",
-    padding: "var(--gap-md)",
-
-    width: "100%",
-    position: "absolute",
-
-    zIndex: 2,
-    userSelect: "none",
-
-    display: "flex",
-    alignItems: "center",
-    flexDirection: "column",
-  },
-});
-
-const Card = styled("div", {
-  base: {
-    pointerEvents: "all",
-
-    maxWidth: "100%",
-    transition: "var(--transitions-fast) all",
-    transitionTimingFunction: "ease-in-out",
-
-    borderRadius: "var(--borderRadius-lg)",
-    background: "var(--md-sys-color-secondary-container)",
-  },
-  variants: {
-    active: {
-      true: {
-        width: "100%",
-        height: "40vh",
-      },
-      false: {
-        width: "360px",
-        height: "120px",
-        cursor: "pointer",
-      },
-    },
-  },
-  defaultVariants: {
-    active: false,
-  },
-});

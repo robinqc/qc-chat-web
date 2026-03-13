@@ -11,6 +11,7 @@ import { Track } from "livekit-client";
 import { styled } from "styled-system/jsx";
 
 import { useUser } from "@revolt/markdown/users";
+import { useVoice } from "@revolt/rtc";
 import { Avatar } from "@revolt/ui/components/design";
 import { Row } from "@revolt/ui/components/layout";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
@@ -18,7 +19,17 @@ import { Symbol } from "@revolt/ui/components/utils/Symbol";
 import { VoiceCallCardActions } from "./VoiceCallCardActions";
 import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
 
+/**
+ * Compact Picture-in-Picture voice card shown in a screen corner when the room
+ * is minimised or the user has navigated away from the voice channel.
+ *
+ * Clicking the card navigates back to the voice channel, which triggers
+ * VoiceChannelCallCardMount to lift the minimised flag and restore the full
+ * expanded view.
+ */
 export function VoiceCallCardPiP() {
+  const voice = useVoice();
+
   const tracks = useTracks(
     [{ source: Track.Source.Microphone, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -26,10 +37,17 @@ export function VoiceCallCardPiP() {
 
   return (
     <MiniCard>
-      <Row>
-        <TrackLoop tracks={tracks}>{() => <ConnectedUser />}</TrackLoop>
-      </Row>
-      <VoiceCallCardStatus />
+      {/*
+       * Clicking the avatar area navigates to the voice channel, which causes
+       * VoiceChannelCallCardMount to mount and call updateState({ channel }),
+       * resetting minimized and expanding back to full view.
+       */}
+      <ChannelLink href={voice.channel()?.path}>
+        <Row>
+          <TrackLoop tracks={tracks}>{() => <ConnectedUser />}</TrackLoop>
+        </Row>
+        <VoiceCallCardStatus />
+      </ChannelLink>
       <VoiceCallCardActions size="xs" />
     </MiniCard>
   );
@@ -76,6 +94,24 @@ const UserIcon = styled("div", {
         },
       },
     },
+  },
+});
+
+/**
+ * Clickable link area covering the participant row + status.
+ * Navigating to the voice channel re-expands the room from PiP.
+ */
+const ChannelLink = styled("a", {
+  base: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "var(--gap-md)",
+    cursor: "pointer",
+    pointerEvents: "all",
+    textDecoration: "none",
+    color: "inherit",
+    flexGrow: 1,
   },
 });
 

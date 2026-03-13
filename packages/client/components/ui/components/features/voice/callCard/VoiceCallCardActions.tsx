@@ -8,7 +8,16 @@ import { useVoice } from "@revolt/rtc";
 import { Button, IconButton } from "@revolt/ui/components/design";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
-export function VoiceCallCardActions(props: { size: "xs" | "sm" }) {
+interface VoiceCallCardActionsProps {
+  size: "xs" | "sm";
+  /**
+   * When provided (full-room mode), a Minimize button is shown that collapses
+   * the room to PiP without leaving the call.
+   */
+  onMinimize?: () => void;
+}
+
+export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
   const voice = useVoice();
   const { t } = useLingui();
 
@@ -24,6 +33,21 @@ export function VoiceCallCardActions(props: { size: "xs" | "sm" }) {
             <Symbol>arrow_top_left</Symbol>
           </IconButton>
         </a>
+      </Show>
+      <Show when={props.size === "sm" && props.onMinimize}>
+        <IconButton
+          size={props.size}
+          variant="standard"
+          onPress={() => props.onMinimize?.()}
+          use:floating={{
+            tooltip: {
+              placement: "top",
+              content: t`Minimise`,
+            },
+          }}
+        >
+          <Symbol>picture_in_picture_alt</Symbol>
+        </IconButton>
       </Show>
       <IconButton
         size={props.size}

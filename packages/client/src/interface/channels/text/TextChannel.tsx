@@ -73,6 +73,13 @@ export function TextChannel(props: ChannelPageProps) {
   const canConnect = () =>
     props.channel.isVoice && props.channel.havePermission("Connect");
 
+  /**
+   * Voice channels always replace the messages area with the room view or the
+   * join-preview card — messages are never shown alongside voice UI.
+   * For non-voice channels, messages are always shown.
+   */
+  const showMessages = () => !canConnect();
+
   // Get a reference to the message box's load latest function
   let jumpToBottomRef: ((nearby?: string) => void) | undefined;
 
@@ -167,9 +174,19 @@ export function TextChannel(props: ChannelPageProps) {
       </Header>
       <Content>
         <main class={main()}>
-          <Show
-            when={canConnect()}
-            fallback={
+          {/*
+           * VoiceChannelCallCardMount renders in normal document flow:
+           * - Expanded (in call, not minimised): shows full-space VoiceRoomView
+           * - Call elsewhere: shows a join-preview card
+           * - No call / minimised: renders nothing (null)
+           * Messages are hidden while the room is expanded to avoid overlap.
+           */}
+          <Show when={canConnect()}>
+            <VoiceChannelCallCardMount channel={props.channel} />
+          </Show>
+
+          <Show when={showMessages()}>
+            <Show when={!canConnect()}>
               <BelowFloatingHeader>
                 <div>
                   <NewMessages
@@ -179,37 +196,35 @@ export function TextChannel(props: ChannelPageProps) {
                   />
                 </div>
               </BelowFloatingHeader>
-            }
-          >
-            <VoiceChannelCallCardMount channel={props.channel} />
+            </Show>
+
+            <Messages
+              channel={props.channel}
+              lastReadId={lastId}
+              pendingMessages={(pendingProps) => (
+                <DraftMessages
+                  channel={props.channel}
+                  tail={pendingProps.tail}
+                  sentIds={pendingProps.ids}
+                />
+              )}
+              typingIndicator={
+                <TypingIndicator
+                  users={props.channel.typing}
+                  ownId={client().user!.id}
+                />
+              }
+              highlightedMessageId={highlightMessageId}
+              clearHighlightedMessage={() => navigate(".")}
+              atEndRef={(ref) => (atEndRef = ref)}
+              jumpToBottomRef={(ref) => (jumpToBottomRef = ref)}
+            />
+
+            <MessageComposition
+              channel={props.channel}
+              onMessageSend={() => jumpToBottomRef?.()}
+            />
           </Show>
-
-          <Messages
-            channel={props.channel}
-            lastReadId={lastId}
-            pendingMessages={(pendingProps) => (
-              <DraftMessages
-                channel={props.channel}
-                tail={pendingProps.tail}
-                sentIds={pendingProps.ids}
-              />
-            )}
-            typingIndicator={
-              <TypingIndicator
-                users={props.channel.typing}
-                ownId={client().user!.id}
-              />
-            }
-            highlightedMessageId={highlightMessageId}
-            clearHighlightedMessage={() => navigate(".")}
-            atEndRef={(ref) => (atEndRef = ref)}
-            jumpToBottomRef={(ref) => (jumpToBottomRef = ref)}
-          />
-
-          <MessageComposition
-            channel={props.channel}
-            onMessageSend={() => jumpToBottomRef?.()}
-          />
         </main>
         <Show
           when={

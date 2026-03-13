@@ -28,10 +28,15 @@ import { VoiceStatefulUserIcons } from "../VoiceStatefulUserIcons";
 import { VoiceCallCardActions } from "./VoiceCallCardActions";
 import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
 
+interface VoiceCallCardActiveRoomProps {
+  /** When provided, a Minimize button is shown in the action bar */
+  onMinimize?: () => void;
+}
+
 /**
  * Call card (active)
  */
-export function VoiceCallCardActiveRoom() {
+export function VoiceCallCardActiveRoom(props: VoiceCallCardActiveRoomProps) {
   return (
     <View>
       <Call>
@@ -41,7 +46,7 @@ export function VoiceCallCardActiveRoom() {
       </Call>
 
       <VoiceCallCardStatus />
-      <VoiceCallCardActions size="sm" />
+      <VoiceCallCardActions size="sm" onMinimize={props.onMinimize} />
     </View>
   );
 }
