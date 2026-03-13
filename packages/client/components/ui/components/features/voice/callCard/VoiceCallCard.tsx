@@ -100,7 +100,7 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
     return {
       "--width": "280px",
       "--height": "158px",
-      "--padding-x": "32px",
+      "--padding-x": "16px",
       "--padding-y": "96px",
       transform: `translate(${
         s.corner === "top-left" || s.corner === "bottom-left"

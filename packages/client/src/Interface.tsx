@@ -150,8 +150,6 @@ const Content = styled("div", {
   variants: {
     sidebar: {
       false: {
-        borderTopLeftRadius: "var(--borderRadius-lg)",
-        borderBottomLeftRadius: "var(--borderRadius-lg)",
         overflow: "hidden",
       },
     },

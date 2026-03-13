@@ -22,11 +22,9 @@ export const Header = styled("div", {
     userSelect: "none",
     overflow: "hidden",
     height: "48px",
-    borderRadius: "var(--borderRadius-lg)",
 
     color: "var(--md-sys-color-on-surface)",
     fill: "var(--md-sys-color-on-surface)",
-
     backgroundSize: "cover !important",
     backgroundPosition: "center !important",
     "& svg": {
