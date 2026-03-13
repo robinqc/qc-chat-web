@@ -151,6 +151,11 @@ const Content = styled("div", {
     sidebar: {
       false: {
         overflow: "hidden",
+        borderTopLeftRadius: "var(--borderRadius-md)",
+        borderLeft:
+          "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
+        borderTop:
+          "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
       },
     },
   },
