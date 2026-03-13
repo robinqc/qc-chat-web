@@ -176,8 +176,10 @@ class Voice {
   async toggleScreenshare() {
     const room = this.room();
     if (!room) throw "invalid state";
+    const enabling = !room.localParticipant.isScreenShareEnabled;
     await room.localParticipant.setScreenShareEnabled(
-      !room.localParticipant.isScreenShareEnabled,
+      enabling,
+      enabling ? { audio: true } : undefined,
     );
 
     this.#setScreenshare(room.localParticipant.isScreenShareEnabled);
