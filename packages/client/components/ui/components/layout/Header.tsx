@@ -1,8 +1,6 @@
 import { styled } from "styled-system/jsx";
 
 export interface Props {
-  readonly placement: "primary" | "secondary";
-
   readonly topBorder?: boolean;
   readonly bottomBorder?: boolean;
 }
@@ -32,15 +30,6 @@ export const Header = styled("div", {
     },
   },
   variants: {
-    placement: {
-      primary: {
-        margin: "var(--gap-md) var(--gap-md) var(--gap-md) 0",
-      },
-      secondary: {
-        margin: "var(--gap-md)",
-        backgroundColor: "var(--md-sys-color-surface-variant)",
-      },
-    },
     image: {
       true: {
         color: "white",
@@ -67,9 +56,15 @@ export const Header = styled("div", {
       },
       false: {},
     },
+    bottomBorder: {
+      true: {
+        borderBottom:
+          "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
+      },
+      false: {},
+    },
   },
   defaultVariants: {
-    placement: "primary",
     image: false,
     transparent: false,
   },

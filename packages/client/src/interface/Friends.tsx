@@ -104,7 +104,7 @@ export function Friends() {
 
   return (
     <Base>
-      <Header placement="primary">
+      <Header bottomBorder>
         <HeaderIcon>
           <Symbol>group</Symbol>
         </HeaderIcon>

@@ -14,6 +14,7 @@ import { useLocation, useNavigate } from "@revolt/routing";
 import {
   Avatar,
   Deferred,
+  Header,
   MenuButton,
   OverflowingText,
   Tooltip,
@@ -67,12 +68,11 @@ export const HomeSidebar = (props: Props) => {
 
   return (
     <SidebarBase>
+      <Header bottomBorder>
+        <Trans>Conversations</Trans>
+      </Header>
       <div ref={scrollTargetElement} use:invisibleScrollable>
         <List>
-          <SidebarTitle>
-            <Trans>Conversations</Trans>
-          </SidebarTitle>
-
           <a href="/app">
             <MenuButton
               size="normal"
@@ -196,18 +196,6 @@ export const HomeSidebar = (props: Props) => {
     </SidebarBase>
   );
 };
-
-/**
- * Sidebar title
- */
-const SidebarTitle = styled("p", {
-  base: {
-    paddingBlock: "calc(var(--gap-md) + 15px)",
-    paddingInline: "var(--gap-md)",
-
-    ...typography.raw({ class: "title" }),
-  },
-});
 
 /**
  * Button title

@@ -105,9 +105,9 @@ const base = cva({
 
     display: "flex",
     alignItems: "center",
-    margin: "0 var(--gap-md)",
+    margin: "var(--gap-sm) var(--gap-md) 0 var(--gap-md)",
     padding: "0 var(--gap-md)",
-    borderRadius: "var(--borderRadius-xl)",
+    borderRadius: "var(--borderRadius-md)",
 
     color: "var(--color)",
     fill: "var(--color)",

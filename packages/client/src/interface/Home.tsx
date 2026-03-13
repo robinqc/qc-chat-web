@@ -102,7 +102,7 @@ export function HomePage() {
 
   return (
     <Base>
-      <Header placement="primary">
+      <Header bottomBorder>
         <HeaderIcon>
           <MdHome {...iconSize(22)} />
         </HeaderIcon>

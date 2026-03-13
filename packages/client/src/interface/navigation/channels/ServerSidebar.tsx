@@ -195,7 +195,7 @@ export const ServerSidebar = (props: Props) => {
     <SidebarBase use:floating={props.menuGenerator(props.server)}>
       <Switch
         fallback={
-          <Header placement="secondary">
+          <Header bottomBorder>
             <ServerInfo
               server={props.server}
               canManageServer={canManageServer()}
@@ -208,7 +208,7 @@ export const ServerSidebar = (props: Props) => {
         <Match when={props.server.banner}>
           <Header
             image
-            placement="secondary"
+            bottomBorder
             style={{
               background: `url('${props.server.bannerURL}')`,
             }}
