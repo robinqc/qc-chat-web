@@ -204,6 +204,8 @@ const MiniCard = styled("div", {
     padding: "var(--gap-md)",
 
     borderRadius: "var(--borderRadius-lg)",
+    border:
+      "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
     background: "var(--md-sys-color-secondary-container)",
   },
 });

@@ -193,35 +193,25 @@ export const ServerSidebar = (props: Props) => {
 
   return (
     <SidebarBase use:floating={props.menuGenerator(props.server)}>
-      <Switch
-        fallback={
-          <Header bottomBorder>
-            <ServerInfo
-              server={props.server}
-              canManageServer={canManageServer()}
-              openServerInfo={props.openServerInfo}
-              openServerSettings={props.openServerSettings}
-            />
-          </Header>
-        }
+      <Header
+        image
+        bottomBorder
+        style={{
+          background: props.server.banner
+            ? `url('${props.server.bannerURL}')`
+            : "var(--md-sys-color-primary)",
+          "--server-banner-gradient": props.server.banner
+            ? "linear-gradient(0deg, black, transparent)"
+            : "none",
+        }}
       >
-        <Match when={props.server.banner}>
-          <Header
-            image
-            bottomBorder
-            style={{
-              background: `url('${props.server.bannerURL}')`,
-            }}
-          >
-            <ServerInfo
-              server={props.server}
-              canManageServer={canManageServer()}
-              openServerInfo={props.openServerInfo}
-              openServerSettings={props.openServerSettings}
-            />
-          </Header>
-        </Match>
-      </Switch>
+        <ServerInfo
+          server={props.server}
+          canManageServer={canManageServer()}
+          openServerInfo={props.openServerInfo}
+          openServerSettings={props.openServerSettings}
+        />
+      </Header>
       <div
         use:invisibleScrollable
         style={{ "flex-grow": 1 }}
@@ -270,7 +260,7 @@ function ServerInfo(
         <IconButton
           size="xs"
           width="narrow"
-          variant={props.server.banner ? "_header" : "standard"}
+          variant="_header"
           onPress={props.openServerSettings}
         >
           <MdSettings {...symbolSize(24)} />

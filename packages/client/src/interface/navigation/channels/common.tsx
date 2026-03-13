@@ -18,7 +18,7 @@ export const SidebarBase = styled("div", {
     background: "var(--md-sys-color-surface-container-low)",
     borderRight:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
-      borderLeft:
+    borderLeft:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
     borderTop:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",

@@ -37,7 +37,10 @@ export const Header = styled("div", {
         color: "white",
         fill: "white",
 
-        padding: 0,
+        paddingTop: 0,
+        paddingRight: 0,
+        paddingBottom: 0,
+        paddingLeft: 0,
         alignItems: "flex-end",
         justifyContent: "stretch",
         textShadow: "0px 0px 1px var(--md-sys-color-shadow)",
@@ -46,7 +49,8 @@ export const Header = styled("div", {
         "& > div": {
           flexGrow: 1,
           padding: "6px 14px",
-          background: "linear-gradient(0deg, black, transparent)",
+          background:
+            "var(--server-banner-gradient, linear-gradient(0deg, black, transparent))",
         },
       },
       false: {},
