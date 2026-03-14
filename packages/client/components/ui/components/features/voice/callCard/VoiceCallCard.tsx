@@ -167,6 +167,10 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
   // ── PiP drag state ─────────────────────────────────────────────────────────
   const [moving, setMoving] = createSignal<boolean>();
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
+  /** Whether the pointer moved enough during this drag to count as a real drag
+   *  (as opposed to a simple click). Used to suppress <a> navigation. */
+  let didDrag = false;
+  const DRAG_THRESHOLD = 5;
 
   /** Compute inline style for the floating PiP container */
   function pipPosition() {
@@ -197,11 +201,18 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
     on(moving, (isMoving) => {
       if (isMoving) {
         const controller = new AbortController();
+        let totalDistance = 0;
+        didDrag = false;
 
         document.addEventListener(
           "mousemove",
           (event) => {
             if (state().type !== "pip") return controller.abort();
+            totalDistance +=
+              Math.abs(event.movementX) + Math.abs(event.movementY);
+            if (totalDistance > DRAG_THRESHOLD) {
+              didDrag = true;
+            }
             setOffset((pos) => ({
               x: pos.x + event.movementX,
               y: pos.y + event.movementY,
@@ -232,7 +243,29 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
           { signal: controller.signal },
         );
 
-        onCleanup(() => controller.abort());
+        // Suppress <a> navigation when the pointer moved enough to be a drag.
+        // Uses capture phase so it fires before the link's default click action.
+        // Registered with `once: true` separately from the AbortController
+        // because the click event fires after mouseup, which triggers cleanup
+        // and would abort this listener before it has a chance to fire.
+        const onClickCapture = (event: MouseEvent) => {
+          if (didDrag) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        };
+        document.addEventListener("click", onClickCapture, {
+          capture: true,
+          once: true,
+        });
+
+        onCleanup(() => {
+          controller.abort();
+          // Safety cleanup in case click never fires (e.g. focus lost)
+          document.removeEventListener("click", onClickCapture, {
+            capture: true,
+          });
+        });
       }
     }),
   );
@@ -305,6 +338,7 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
                 setOffset({ x: 0, y: 0 });
               });
             }}
+            onDragStart={(e: DragEvent) => e.preventDefault()}
           >
             <InRoom>
               <VoiceCallCardPiP />

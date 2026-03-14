@@ -32,13 +32,6 @@ export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
 
   return (
     <Actions>
-      <Show when={props.size === "xs"}>
-        <a href={voice.channel()?.path}>
-          <IconButton variant="standard" size={props.size}>
-            <Symbol>arrow_top_left</Symbol>
-          </IconButton>
-        </a>
-      </Show>
       <Show when={props.size === "sm" && props.onMinimize}>
         <IconButton
           size={props.size}
@@ -93,65 +86,67 @@ export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
           <Symbol>headset_off</Symbol>
         </Show>
       </IconButton>
-      <IconButton
-        size={props.size}
-        variant={isVideoEnabled() && voice.video() ? "filled" : "tonal"}
-        onPress={() => {
-          if (isVideoEnabled()) voice.toggleCamera();
-        }}
-        use:floating={{
-          tooltip: {
-            placement: "top",
-            content: isVideoEnabled()
-              ? voice.video()
-                ? "Stop Camera"
-                : "Start Camera"
-              : "Coming soon! 👀",
-          },
-        }}
-        isDisabled={!isVideoEnabled()}
-      >
-        <Symbol>camera_video</Symbol>
-      </IconButton>
-      <IconButton
-        size={props.size}
-        variant={isVideoEnabled() && voice.screenshare() ? "filled" : "tonal"}
-        onPress={() => {
-          if (isVideoEnabled()) voice.toggleScreenshare();
-        }}
-        use:floating={{
-          tooltip: {
-            placement: "top",
-            content: isVideoEnabled()
-              ? voice.screenshare()
-                ? "Stop Sharing"
-                : "Share Screen"
-              : "Coming soon! 👀",
-          },
-        }}
-        isDisabled={!isVideoEnabled()}
-      >
-        <Show
-          when={!isVideoEnabled() || voice.screenshare()}
-          fallback={<Symbol>stop_screen_share</Symbol>}
-        >
-          <Symbol>screen_share</Symbol>
-        </Show>
-      </IconButton>
-      <Show when={watchCount() > 0}>
+      <Show when={props.size === "sm"}>
         <IconButton
           size={props.size}
-          variant="tonal"
-          onPress={() => watchCtx?.unwatchAll()}
+          variant={isVideoEnabled() && voice.video() ? "filled" : "tonal"}
+          onPress={() => {
+            if (isVideoEnabled()) voice.toggleCamera();
+          }}
           use:floating={{
             tooltip: {
               placement: "top",
-              content: `Stop Watching (${watchCount()})`,
+              content: isVideoEnabled()
+                ? voice.video()
+                  ? "Stop Camera"
+                  : "Start Camera"
+                : "Coming soon! 👀",
             },
           }}
+          isDisabled={!isVideoEnabled()}
         >
-          <Symbol>visibility_off</Symbol>
+          <Symbol>camera_video</Symbol>
         </IconButton>
+        <IconButton
+          size={props.size}
+          variant={isVideoEnabled() && voice.screenshare() ? "filled" : "tonal"}
+          onPress={() => {
+            if (isVideoEnabled()) voice.toggleScreenshare();
+          }}
+          use:floating={{
+            tooltip: {
+              placement: "top",
+              content: isVideoEnabled()
+                ? voice.screenshare()
+                  ? "Stop Sharing"
+                  : "Share Screen"
+                : "Coming soon! 👀",
+            },
+          }}
+          isDisabled={!isVideoEnabled()}
+        >
+          <Show
+            when={!isVideoEnabled() || voice.screenshare()}
+            fallback={<Symbol>stop_screen_share</Symbol>}
+          >
+            <Symbol>screen_share</Symbol>
+          </Show>
+        </IconButton>
+        <Show when={watchCount() > 0}>
+          <IconButton
+            size={props.size}
+            variant="tonal"
+            onPress={() => watchCtx?.unwatchAll()}
+            use:floating={{
+              tooltip: {
+                placement: "top",
+                content: `Stop Watching (${watchCount()})`,
+              },
+            }}
+          >
+            <Symbol>visibility_off</Symbol>
+          </IconButton>
+        </Show>
       </Show>
       <Button
         size={props.size}
@@ -167,13 +162,14 @@ export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
 const Actions = styled("div", {
   base: {
     flexShrink: 0,
-    gap: "var(--gap-md)",
-    padding: "var(--gap-md)",
+    gap: "var(--gap-sm)",
+    padding: "var(--gap-sm)",
 
     display: "flex",
-    width: "fit-content",
+    flexWrap: "wrap",
     justifyContent: "center",
     alignSelf: "center",
+    maxWidth: "100%",
 
     borderRadius: "var(--borderRadius-full)",
     background: "var(--md-sys-color-surface-container)",

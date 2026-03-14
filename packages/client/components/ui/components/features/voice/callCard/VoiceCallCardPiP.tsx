@@ -62,19 +62,19 @@ export function VoiceCallCardPiP() {
 
   return (
     <MiniCard>
-      <ChannelLink href={voice.channel()?.path}>
+      <ChannelLink href={voice.channel()?.path} draggable={false}>
         <Show
           when={focusedTrack()}
           fallback={
             // No focused stream: normal avatar row + status
-            <>
+            <FallbackContent>
               <Row>
                 <TrackLoop tracks={micTracks}>
                   {() => <ConnectedUser />}
                 </TrackLoop>
               </Row>
               <VoiceCallCardStatus />
-            </>
+            </FallbackContent>
           }
         >
           {(focused) => (
@@ -101,7 +101,9 @@ export function VoiceCallCardPiP() {
           )}
         </Show>
       </ChannelLink>
-      <VoiceCallCardActions size="xs" />
+      <ActionsOverlay data-pip-actions>
+        <VoiceCallCardActions size="xs" />
+      </ActionsOverlay>
     </MiniCard>
   );
 }
@@ -151,7 +153,7 @@ const UserIcon = styled("div", {
 });
 
 /**
- * Clickable link area covering the participant row + status (or the video).
+ * Clickable link area covering the entire PiP card.
  * Navigating to the voice channel re-expands the room from PiP.
  */
 const ChannelLink = styled("a", {
@@ -159,31 +161,30 @@ const ChannelLink = styled("a", {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--gap-md)",
+    justifyContent: "center",
     cursor: "pointer",
     pointerEvents: "all",
     textDecoration: "none",
     color: "inherit",
-    flexGrow: 1,
+    // Fill the entire card
+    position: "absolute",
+    inset: 0,
     overflow: "hidden",
-    width: "100%",
   },
 });
 
 /**
  * Container for the focused stream video in PiP mode.
- * Fills the available space above the action bar.
+ * Fills the entire card area via the absolutely-positioned ChannelLink parent.
  */
 const PiPVideoContainer = styled("div", {
   base: {
     width: "100%",
-    flexGrow: 1,
-    minHeight: 0,
+    height: "100%",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    borderRadius: "var(--borderRadius-md)",
   },
 });
 
@@ -195,17 +196,56 @@ const MiniCard = styled("div", {
     width: "100%",
     height: "100%",
 
-    display: "flex",
-    alignItems: "center",
-    flexDirection: "column",
-    justifyContent: "center",
-
-    gap: "var(--gap-md)",
-    padding: "var(--gap-md)",
+    position: "relative",
+    overflow: "hidden",
 
     borderRadius: "var(--borderRadius-lg)",
     border:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
     background: "var(--md-sys-color-secondary-container)",
+
+    // Hide toolbar by default, show on hover
+    "& > [data-pip-actions]": {
+      opacity: 0,
+      transition: "opacity 0.2s ease",
+    },
+    "&:hover > [data-pip-actions]": {
+      opacity: 1,
+    },
+  },
+});
+
+/**
+ * Fallback content shown when no focused video stream is available.
+ * Centers avatar row + status within the card.
+ */
+const FallbackContent = styled("div", {
+  base: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "var(--gap-md)",
+    width: "100%",
+    height: "100%",
+  },
+});
+
+/**
+ * Toolbar overlay positioned at the bottom of the PiP card.
+ * Fades in on hover via MiniCard's CSS rules.
+ */
+const ActionsOverlay = styled("div", {
+  base: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    display: "flex",
+    justifyContent: "center",
+    padding: "var(--gap-sm)",
+    background: "linear-gradient(transparent, rgba(0,0,0,0.5))",
+    zIndex: 1,
+    pointerEvents: "all",
   },
 });
