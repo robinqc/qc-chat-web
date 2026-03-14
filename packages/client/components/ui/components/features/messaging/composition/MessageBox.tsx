@@ -98,16 +98,19 @@ const Base = styled("div", {
 
     paddingInlineEnd: "var(--gap-md)",
     paddingBlock: "var(--gap-sm)",
-    borderStartRadius: "var(--borderRadius-xl)",
+    borderRadius: "var(--borderRadius-xl)",
 
     display: "flex",
-    background: "var(--md-sys-color-surface-container-high)",
+    background:
+      "color-mix(in srgb, var(--md-sys-color-surface-container-high) 60%, transparent)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
     color: "var(--md-sys-color-on-surface)",
   },
   variants: {
     hasActionsAppend: {
       true: {
-        borderEndRadius: "var(--borderRadius-md)",
+        borderEndRadius: "var(--borderRadius-xl)",
       },
       false: {
         borderEndRadius: "var(--borderRadius-xl)",
@@ -126,7 +129,7 @@ const Parent = styled("div", {
 
     display: "flex",
     gap: "var(--gap-md)",
-    margin: "0 0 var(--gap-md) 0",
+    padding: "var(--gap-sm) 0 var(--gap-md) 0",
     maxHeight: "var(--layout-height-message-box)",
   },
 });
@@ -232,12 +235,20 @@ export function MessageBox(props: Props) {
 MessageBox.InlineIcon = InlineIcon;
 
 /**
- * Container for appended actions (e.g. send button), pinned to bottom
+ * Container for appended actions (e.g. send button), pinned to bottom.
+ * Applies frosted acrylic glass to the button so it matches the message box.
  */
 const AppendContainer = styled("div", {
   base: {
     display: "flex",
     alignItems: "flex-end",
     paddingBottom: "var(--gap-sm)",
+
+    "& button": {
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
+      background:
+        "color-mix(in srgb, var(--md-sys-color-primary) 60%, transparent)",
+    },
   },
 });

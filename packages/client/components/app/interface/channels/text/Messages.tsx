@@ -901,6 +901,7 @@ export function Messages(props: Props) {
         <Deferred>
           <div>
             <div ref={listRef}>
+              <TopPadding />
               <Show when={atStart()}>
                 <ConversationStart channel={props.channel} />
               </Show>
@@ -924,7 +925,8 @@ export function Messages(props: Props) {
                   tail: pendingMessageIsTrailing(),
                   ids: sentMessageIdempotency(),
                 })}
-                {props.typingIndicator ?? <Padding />}
+                {props.typingIndicator}
+                <Padding />
               </Show>
             </div>
           </div>
@@ -956,11 +958,25 @@ const AnchorToEnd = styled("div", {
 });
 
 /**
- * Container padding
+ * Container padding at the bottom of the message list.
+ * Uses a CSS custom property so the parent can push content above the
+ * absolutely-positioned composition overlay.
  */
 const Padding = styled("div", {
   base: {
-    height: "24px",
+    height: "var(--overlay-bottom-height, 80px)",
+  },
+});
+
+/**
+ * Container padding at the top of the message list.
+ * Uses a CSS custom property so the parent can push content below the
+ * absolutely-positioned top banner overlay (e.g. voice channel card).
+ */
+const TopPadding = styled("div", {
+  base: {
+    height: "var(--overlay-top-height, 0px)",
+    flexShrink: 0,
   },
 });
 

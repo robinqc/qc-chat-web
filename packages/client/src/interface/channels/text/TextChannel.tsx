@@ -21,7 +21,6 @@ import { LAYOUT_SECTIONS } from "@revolt/state/stores/Layout";
 import {
   BelowFloatingHeader,
   Header,
-  IconButton,
   NewMessages,
   Text,
   TypingIndicator,
@@ -37,7 +36,6 @@ import { ChannelPageProps } from "../ChannelPage";
 
 import { useVoice } from "@revolt/rtc";
 import { VoiceCallCardPreview } from "@revolt/ui/components/features/voice/callCard/VoiceCallCardPreview";
-import { Symbol } from "@revolt/ui/components/utils/Symbol";
 import { MessageComposition } from "./Composition";
 import { MemberSidebar } from "./MemberSidebar";
 import { TextSearchSidebar } from "./TextSearchSidebar";
@@ -242,52 +240,63 @@ export function TextChannel(props: ChannelPageProps) {
 
           {/* Messages area: shown for text channels always, and for voice channels in messages view */}
           <Show when={showMessages()}>
-            {/*
-             * Compact "Join voice channel" preview card shown at the top of
-             * the message area when viewing a voice channel but not in a call.
-             */}
-            <Show when={canConnect() && !isInCallHere()}>
-              <CompactPreviewWrapper>
-                <VoiceCallCardPreview channel={props.channel} compact />
-              </CompactPreviewWrapper>
-            </Show>
+            <MessagesArea
+              style={{
+                "--overlay-top-height":
+                  canConnect() && !isInCallHere() ? "72px" : "0px",
+                "--overlay-bottom-height": "80px",
+              }}
+            >
+              {/*
+               * Compact "Join voice channel" preview card shown at the top of
+               * the message area when viewing a voice channel but not in a call.
+               * Absolutely positioned to float over the message list.
+               */}
+              <Show when={canConnect() && !isInCallHere()}>
+                <TopOverlay>
+                  <VoiceCallCardPreview channel={props.channel} compact />
+                </TopOverlay>
+              </Show>
 
-            <BelowFloatingHeader>
-              <div>
-                <NewMessages
-                  lastId={lastId}
-                  jumpBack={() => navigate(lastId()!)}
-                  dismiss={() => setLastId()}
-                />
-              </div>
-            </BelowFloatingHeader>
+              <BelowFloatingHeader>
+                <div>
+                  <NewMessages
+                    lastId={lastId}
+                    jumpBack={() => navigate(lastId()!)}
+                    dismiss={() => setLastId()}
+                  />
+                </div>
+              </BelowFloatingHeader>
 
-            <Messages
-              channel={props.channel}
-              lastReadId={lastId}
-              pendingMessages={(pendingProps) => (
-                <DraftMessages
+              <Messages
+                channel={props.channel}
+                lastReadId={lastId}
+                pendingMessages={(pendingProps) => (
+                  <DraftMessages
+                    channel={props.channel}
+                    tail={pendingProps.tail}
+                    sentIds={pendingProps.ids}
+                  />
+                )}
+                typingIndicator={
+                  <TypingIndicator
+                    users={props.channel.typing}
+                    ownId={client().user!.id}
+                  />
+                }
+                highlightedMessageId={highlightMessageId}
+                clearHighlightedMessage={() => navigate(".")}
+                atEndRef={(ref) => (atEndRef = ref)}
+                jumpToBottomRef={(ref) => (jumpToBottomRef = ref)}
+              />
+
+              <BottomOverlay>
+                <MessageComposition
                   channel={props.channel}
-                  tail={pendingProps.tail}
-                  sentIds={pendingProps.ids}
+                  onMessageSend={() => jumpToBottomRef?.()}
                 />
-              )}
-              typingIndicator={
-                <TypingIndicator
-                  users={props.channel.typing}
-                  ownId={client().user!.id}
-                />
-              }
-              highlightedMessageId={highlightMessageId}
-              clearHighlightedMessage={() => navigate(".")}
-              atEndRef={(ref) => (atEndRef = ref)}
-              jumpToBottomRef={(ref) => (jumpToBottomRef = ref)}
-            />
-
-            <MessageComposition
-              channel={props.channel}
-              onMessageSend={() => jumpToBottomRef?.()}
-            />
+              </BottomOverlay>
+            </MessagesArea>
           </Show>
         </main>
         <Show
@@ -376,14 +385,64 @@ const Content = styled("div", {
 });
 
 /**
- * Wrapper for the compact "Join voice channel" preview card at the top of
- * the message area in voice channels.
+ * Relative wrapper for the messages area.
+ * All overlays (top voice banner, bottom composition) are absolutely
+ * positioned within this container so they float over the scrollable
+ * message list.
+ *
+ * CSS custom properties:
+ *  --overlay-top-height:    height of the top floating banner
+ *  --overlay-bottom-height: height of the bottom floating input
  */
-const CompactPreviewWrapper = styled("div", {
+const MessagesArea = styled("div", {
   base: {
+    position: "relative",
+    flexGrow: 1,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  },
+});
+
+/**
+ * Absolutely positioned overlay at the top of the messages area.
+ * Houses the compact "Join voice channel" preview card.
+ * Transparent container — the frosted effect lives on the child elements.
+ */
+const TopOverlay = styled("div", {
+  base: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     padding: "var(--gap-md)",
-    paddingBottom: 0,
-    flexShrink: 0,
+    pointerEvents: "none",
+
+    "& > *": {
+      pointerEvents: "auto",
+    },
+  },
+});
+
+/**
+ * Absolutely positioned overlay at the bottom of the messages area.
+ * Houses the message composition (input + send button).
+ * Transparent container — the frosted effect lives on the child elements.
+ */
+const BottomOverlay = styled("div", {
+  base: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    pointerEvents: "none",
+
+    "& > *": {
+      pointerEvents: "auto",
+    },
   },
 });
 

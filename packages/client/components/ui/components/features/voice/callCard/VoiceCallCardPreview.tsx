@@ -86,7 +86,9 @@ const Preview = styled("div", {
         height: "auto",
         padding: "var(--gap-md)",
         background:
-          "color-mix(in srgb, var(--md-sys-color-surface-container) 80%, transparent)",
+          "color-mix(in srgb, var(--md-sys-color-surface-container) 60%, transparent)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         border:
           "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
         flexDirection: "row",
