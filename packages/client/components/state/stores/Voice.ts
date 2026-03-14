@@ -13,6 +13,24 @@ const NoiseSuppresionStates: NoiseSuppresionState[] = [
   "enhanced",
 ];
 
+/**
+ * Screen share resolution presets
+ */
+export type ScreenShareResolution = "720" | "1080" | "original";
+
+const ScreenShareResolutions: ScreenShareResolution[] = [
+  "720",
+  "1080",
+  "original",
+];
+
+/**
+ * Screen share frame rate options
+ */
+export type ScreenShareFrameRate = 30 | 60;
+
+const ScreenShareFrameRates: ScreenShareFrameRate[] = [30, 60];
+
 export interface TypeVoice {
   preferredAudioInputDevice?: string;
   preferredAudioOutputDevice?: string;
@@ -27,6 +45,9 @@ export interface TypeVoice {
   userMutes: Record<string, boolean>;
 
   screenShareVolumes: Record<string, number>;
+
+  screenShareResolution: ScreenShareResolution;
+  screenShareFrameRate: ScreenShareFrameRate;
 }
 
 /**
@@ -60,6 +81,8 @@ export class Voice extends AbstractStore<"voice", TypeVoice> {
       userVolumes: {},
       userMutes: {},
       screenShareVolumes: {},
+      screenShareResolution: "1080",
+      screenShareFrameRate: 30,
     };
   }
 
@@ -125,6 +148,20 @@ export class Voice extends AbstractStore<"voice", TypeVoice> {
             typeof userId === "string" && typeof volume === "number",
         )
         .forEach(([k, v]) => (data.screenShareVolumes[k] = v));
+    }
+
+    if (
+      input.screenShareResolution &&
+      ScreenShareResolutions.includes(input.screenShareResolution)
+    ) {
+      data.screenShareResolution = input.screenShareResolution;
+    }
+
+    if (
+      typeof input.screenShareFrameRate === "number" &&
+      ScreenShareFrameRates.includes(input.screenShareFrameRate)
+    ) {
+      data.screenShareFrameRate = input.screenShareFrameRate;
     }
 
     return data;
@@ -266,5 +303,33 @@ export class Voice extends AbstractStore<"voice", TypeVoice> {
    */
   get outputVolume(): number {
     return this.get().outputVolume;
+  }
+
+  /**
+   * Set screen share resolution
+   */
+  set screenShareResolution(value: ScreenShareResolution) {
+    this.set("screenShareResolution", value);
+  }
+
+  /**
+   * Get screen share resolution
+   */
+  get screenShareResolution(): ScreenShareResolution {
+    return this.get().screenShareResolution;
+  }
+
+  /**
+   * Set screen share frame rate
+   */
+  set screenShareFrameRate(value: ScreenShareFrameRate) {
+    this.set("screenShareFrameRate", value);
+  }
+
+  /**
+   * Get screen share frame rate
+   */
+  get screenShareFrameRate(): ScreenShareFrameRate {
+    return this.get().screenShareFrameRate;
   }
 }

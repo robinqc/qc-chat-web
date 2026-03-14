@@ -1,4 +1,4 @@
-import { createMemo, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 
 import { useLingui } from "@lingui-solid/solid/macro";
 import { styled } from "styled-system/jsx";
@@ -8,6 +8,7 @@ import { useVoice } from "@revolt/rtc";
 import { Button, IconButton } from "@revolt/ui/components/design";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
+import { ScreenSharePicker } from "./ScreenSharePicker";
 import { useScreenShareWatch } from "./VoiceCallCard";
 
 interface VoiceCallCardActionsProps {
@@ -26,8 +27,23 @@ export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
 
   const watchCount = createMemo(() => watchCtx?.watchedIds().size ?? 0);
 
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  let screenShareBtnRef: HTMLSpanElement | undefined;
+
   function isVideoEnabled() {
     return CONFIGURATION.ENABLE_VIDEO;
+  }
+
+  function handleScreenShareClick() {
+    if (!isVideoEnabled()) return;
+
+    if (voice.screenshare()) {
+      // Already sharing -- stop immediately
+      voice.toggleScreenshare();
+    } else {
+      // Open the quality picker
+      setPickerOpen(true);
+    }
   }
 
   return (
@@ -107,31 +123,38 @@ export function VoiceCallCardActions(props: VoiceCallCardActionsProps) {
         >
           <Symbol>camera_video</Symbol>
         </IconButton>
-        <IconButton
-          size={props.size}
-          variant={isVideoEnabled() && voice.screenshare() ? "filled" : "tonal"}
-          onPress={() => {
-            if (isVideoEnabled()) voice.toggleScreenshare();
-          }}
-          use:floating={{
-            tooltip: {
-              placement: "top",
-              content: isVideoEnabled()
-                ? voice.screenshare()
-                  ? "Stop Sharing"
-                  : "Share Screen"
-                : "Coming soon! 👀",
-            },
-          }}
-          isDisabled={!isVideoEnabled()}
-        >
-          <Show
-            when={!isVideoEnabled() || voice.screenshare()}
-            fallback={<Symbol>stop_screen_share</Symbol>}
+        <span ref={screenShareBtnRef} style={{ display: "inline-flex" }}>
+          <IconButton
+            size={props.size}
+            variant={
+              isVideoEnabled() && voice.screenshare() ? "filled" : "tonal"
+            }
+            onPress={handleScreenShareClick}
+            use:floating={{
+              tooltip: {
+                placement: "top",
+                content: isVideoEnabled()
+                  ? voice.screenshare()
+                    ? "Stop Sharing"
+                    : "Share Screen"
+                  : "Coming soon! 👀",
+              },
+            }}
+            isDisabled={!isVideoEnabled()}
           >
-            <Symbol>screen_share</Symbol>
-          </Show>
-        </IconButton>
+            <Show
+              when={!isVideoEnabled() || voice.screenshare()}
+              fallback={<Symbol>stop_screen_share</Symbol>}
+            >
+              <Symbol>screen_share</Symbol>
+            </Show>
+          </IconButton>
+        </span>
+        <ScreenSharePicker
+          anchor={screenShareBtnRef}
+          open={pickerOpen()}
+          onClose={() => setPickerOpen(false)}
+        />
         <Show when={watchCount() > 0}>
           <IconButton
             size={props.size}

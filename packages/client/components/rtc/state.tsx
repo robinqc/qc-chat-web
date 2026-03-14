@@ -14,12 +14,20 @@ import { DenoiseTrackProcessor } from "livekit-rnnoise-processor";
 import { Channel } from "stoat.js";
 
 import { useState } from "@revolt/state";
-import { Voice as VoiceSettings } from "@revolt/state/stores/Voice";
+import {
+  type ScreenShareFrameRate,
+  type ScreenShareResolution,
+  Voice as VoiceSettings,
+} from "@revolt/state/stores/Voice";
 import { VoiceCallCardContext } from "@revolt/ui/components/features/voice/callCard/VoiceCallCard";
 
 import { CONFIGURATION } from "@revolt/common";
 import { InRoom } from "./components/InRoom";
 import { RoomAudioManager } from "./components/RoomAudioManager";
+import {
+  buildDefaultPublishDefaults,
+  buildScreenShareOptions,
+} from "./screenShareOptions";
 
 type State =
   | "READY"
@@ -88,6 +96,8 @@ class Voice {
     this.disconnect();
 
     const room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
       audioCaptureDefaults: {
         deviceId: this.#settings.preferredAudioInputDevice,
         echoCancellation: this.#settings.echoCancellation,
@@ -96,6 +106,10 @@ class Voice {
       audioOutput: {
         deviceId: this.#settings.preferredAudioOutputDevice,
       },
+      publishDefaults: buildDefaultPublishDefaults(
+        this.#settings.screenShareResolution,
+        this.#settings.screenShareFrameRate,
+      ),
     });
 
     batch(() => {
@@ -192,14 +206,34 @@ class Voice {
     this.#setVideo(room.localParticipant.isCameraEnabled);
   }
 
-  async toggleScreenshare() {
+  async toggleScreenshare(
+    resolution?: ScreenShareResolution,
+    frameRate?: ScreenShareFrameRate,
+  ) {
     const room = this.room();
     if (!room) throw "invalid state";
     const enabling = !room.localParticipant.isScreenShareEnabled;
-    await room.localParticipant.setScreenShareEnabled(
-      enabling,
-      enabling ? { audio: true } : undefined,
-    );
+
+    if (enabling) {
+      const res = resolution ?? this.#settings.screenShareResolution;
+      const fps = frameRate ?? this.#settings.screenShareFrameRate;
+
+      // Persist chosen quality as the new default
+      this.#settings.screenShareResolution = res;
+      this.#settings.screenShareFrameRate = fps;
+
+      const { captureOptions, publishOptions } = buildScreenShareOptions(
+        res,
+        fps,
+      );
+      await room.localParticipant.setScreenShareEnabled(
+        true,
+        captureOptions,
+        publishOptions,
+      );
+    } else {
+      await room.localParticipant.setScreenShareEnabled(false);
+    }
 
     this.#setScreenshare(room.localParticipant.isScreenShareEnabled);
   }
