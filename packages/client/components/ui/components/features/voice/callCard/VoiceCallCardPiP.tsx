@@ -17,11 +17,13 @@ import { styled } from "styled-system/jsx";
 
 import { useUser } from "@revolt/markdown/users";
 import { useVoice } from "@revolt/rtc";
+import { useState } from "@revolt/state";
 import { Avatar } from "@revolt/ui/components/design";
 import { Row } from "@revolt/ui/components/layout";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
+import { createMaterialColourVariables } from "@revolt/ui/themes";
 
-import { useScreenShareWatch } from "./VoiceCallCard";
+import { useScreenShareWatch, useVoiceExpand } from "./VoiceCallCard";
 import { VoiceCallCardActions } from "./VoiceCallCardActions";
 import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
 
@@ -39,7 +41,17 @@ import { VoiceCallCardStatus } from "./VoiceCallCardStatus";
  */
 export function VoiceCallCardPiP() {
   const voice = useVoice();
+  const state = useState();
   const watchCtx = useScreenShareWatch();
+  const expand = useVoiceExpand();
+
+  // Force dark palette on the PiP card regardless of global theme mode
+  const darkVars = createMemo(() =>
+    createMaterialColourVariables(
+      { ...state.theme.activeTheme, darkMode: true },
+      "--md-sys-color-",
+    ),
+  );
 
   const micTracks = useTracks(
     [{ source: Track.Source.Microphone, withPlaceholder: true }],
@@ -61,8 +73,12 @@ export function VoiceCallCardPiP() {
   });
 
   return (
-    <MiniCard>
-      <ChannelLink href={voice.channel()?.path} draggable={false}>
+    <MiniCard style={darkVars()}>
+      <ChannelLink
+        href={voice.channel()?.path}
+        draggable={false}
+        onClick={() => expand()}
+      >
         <Show
           when={focusedTrack()}
           fallback={
@@ -202,7 +218,7 @@ const MiniCard = styled("div", {
     borderRadius: "var(--borderRadius-lg)",
     border:
       "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
-    background: "var(--md-sys-color-secondary-container)",
+    background: "black",
 
     // Hide toolbar by default, show on hover
     "& > [data-pip-actions]": {
@@ -228,6 +244,13 @@ const FallbackContent = styled("div", {
     gap: "var(--gap-md)",
     width: "100%",
     height: "100%",
+
+    // Subtle coloured glow at the bottom, matching the expanded room view
+    backgroundImage:
+      "radial-gradient(ellipse 70% 60px at 50% 100%, color-mix(in srgb, var(--md-sys-color-primary) 25%, transparent) 0%, transparent 100%)",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "bottom center",
+    backgroundSize: "100% 100px",
   },
 });
 

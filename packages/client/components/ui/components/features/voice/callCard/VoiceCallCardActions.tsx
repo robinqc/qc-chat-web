@@ -172,6 +172,11 @@ const Actions = styled("div", {
     maxWidth: "100%",
 
     borderRadius: "var(--borderRadius-full)",
-    background: "var(--md-sys-color-surface-container)",
+
+    // Acrylic / frosted-glass effect
+    background: "rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
   },
 });

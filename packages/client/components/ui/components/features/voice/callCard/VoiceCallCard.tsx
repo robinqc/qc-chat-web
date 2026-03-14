@@ -1,6 +1,7 @@
 import {
   Accessor,
   JSX,
+  Setter,
   Show,
   batch,
   createContext,
@@ -14,13 +15,14 @@ import {
 import { Portal } from "solid-js/web";
 
 import { Channel } from "stoat.js";
-import { css } from "styled-system/css";
 
 import { InRoom, useVoice } from "@revolt/rtc";
 
 import { VoiceCallCardPiP } from "./VoiceCallCardPiP";
-import { VoiceCallCardPreview } from "./VoiceCallCardPreview";
 import { VoiceRoomView } from "./VoiceRoomView";
+
+/** View mode for voice channels: messages list or the full voice room */
+export type VoiceViewMode = "messages" | "voiceroom";
 
 /**
  * Voice layout state:
@@ -63,6 +65,8 @@ type CallCardContextValue = {
   updateState: (payload?: ExpandPayload) => void;
   /** Explicitly minimise the room to PiP */
   minimize: () => void;
+  /** Lift the minimised flag so the room expands (e.g. clicking PiP card) */
+  expand: () => void;
   /** Whether the room is currently minimised by the user */
   minimized: Accessor<boolean>;
   /** Screen share watch/focus state — accessible from both PiP and expanded */
@@ -100,6 +104,16 @@ export function useVoiceExpanded(
 export function useScreenShareWatch(): ScreenShareWatchContextValue | null {
   const ctx = useContext(callCardContext);
   return ctx?.screenShareWatch ?? null;
+}
+
+/**
+ * Lift the minimised flag from PiP so the expanded voice room renders.
+ * Used by the PiP card's click handler to force open the voice room view
+ * when the user clicks the floating card.
+ */
+export function useVoiceExpand(): () => void {
+  const ctx = useContext(callCardContext);
+  return () => ctx?.expand();
 }
 
 /**
@@ -285,6 +299,12 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
     setState({ type: "pip", corner: "bottom-right" });
   }
 
+  /** Lift the minimised flag so the expanded room view renders again.
+   *  Called by the PiP card on click to force the voice room open. */
+  function expand() {
+    setMinimized(false);
+  }
+
   function updateStateWithTransition(payload?: ExpandPayload) {
     if (!document.startViewTransition) {
       updateState(payload);
@@ -306,6 +326,7 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
   const contextValue: CallCardContextValue = {
     updateState: handleMountUpdate,
     minimize,
+    expand,
     minimized,
     screenShareWatch,
   };
@@ -352,13 +373,18 @@ export function VoiceCallCardContext(props: { children: JSX.Element }) {
 
 /**
  * Placed inside TextChannel for voice-capable channels.
- * - When the user is on this channel and not minimised: renders the full-space
- *   VoiceRoomView in normal document flow.
- * - Otherwise (no active call, or call active in a different channel): renders
- *   VoiceCallCardPreview so the user can join or switch to this channel's call.
- * - On cleanup (navigating away): reverts to PiP.
+ * Rendering depends on the current viewMode:
+ * - "voiceroom" + in active call: renders the full-space VoiceRoomView.
+ * - "messages": renders nothing (messages show underneath, PiP handles call).
+ * - Not in call: renders nothing (the compact preview card is placed separately
+ *   in TextChannel above the messages).
+ * On cleanup (navigating away): reverts to PiP.
  */
-export function VoiceChannelCallCardMount(props: { channel: Channel }) {
+export function VoiceChannelCallCardMount(props: {
+  channel: Channel;
+  viewMode: Accessor<VoiceViewMode>;
+  setViewMode: Setter<VoiceViewMode>;
+}) {
   const voice = useVoice();
   const { updateState, minimize, minimized } = useContext(callCardContext)!;
 
@@ -376,20 +402,64 @@ export function VoiceChannelCallCardMount(props: { channel: Channel }) {
     }
   });
 
+  // Auto-switch to voiceroom when the user joins the call on this channel,
+  // or when the minimized flag is lifted (e.g. clicking the PiP card to
+  // return to the voice channel).
+  createEffect(
+    on(
+      () => isActiveChannel() && !minimized(),
+      (active, prevActive) => {
+        if (active && !prevActive) {
+          props.setViewMode("voiceroom");
+        }
+      },
+    ),
+  );
+
+  // When viewMode switches to "voiceroom" while in a call, lift the minimized
+  // flag so the expanded room view renders (e.g. user clicked the voice room
+  // toggle in the header while viewing messages during a call).
+  createEffect(
+    on(
+      () => props.viewMode() === "voiceroom" && isActiveChannel(),
+      (shouldExpand) => {
+        if (shouldExpand && minimized()) {
+          updateState({ channel: props.channel });
+        }
+      },
+    ),
+  );
+
+  // Auto-switch to messages when the user disconnects
+  createEffect(
+    on(
+      () => voice.channel()?.id,
+      (channelId, prevChannelId) => {
+        if (!channelId && prevChannelId) {
+          props.setViewMode("messages");
+        }
+      },
+    ),
+  );
+
+  /** Switch from voiceroom to messages view (triggers PiP) */
+  function switchToMessages() {
+    minimize();
+    props.setViewMode("messages");
+  }
+
   onCleanup(() => updateState());
 
   return (
     <Show
-      when={isActiveChannel() && !minimized()}
-      fallback={
-        // Shown when: not in this call (no call at all, or call is elsewhere).
-        // VoiceCallCardPreview handles both "Join" and "Switch" labels itself.
-        <div class={css({ padding: "var(--gap-md)", height: "100%" })}>
-          <VoiceCallCardPreview channel={props.channel} />
-        </div>
+      when={
+        isActiveChannel() && !minimized() && props.viewMode() === "voiceroom"
       }
     >
-      <VoiceRoomView onMinimize={minimize} />
+      <VoiceRoomView
+        onMinimize={minimize}
+        onSwitchToMessages={switchToMessages}
+      />
     </Show>
   );
 }

@@ -21,16 +21,23 @@ import { LAYOUT_SECTIONS } from "@revolt/state/stores/Layout";
 import {
   BelowFloatingHeader,
   Header,
+  IconButton,
   NewMessages,
   Text,
   TypingIndicator,
   main,
 } from "@revolt/ui";
-import { VoiceChannelCallCardMount } from "@revolt/ui/components/features/voice/callCard/VoiceCallCard";
+import {
+  VoiceChannelCallCardMount,
+  VoiceViewMode,
+} from "@revolt/ui/components/features/voice/callCard/VoiceCallCard";
 
 import { ChannelHeader } from "../ChannelHeader";
 import { ChannelPageProps } from "../ChannelPage";
 
+import { useVoice } from "@revolt/rtc";
+import { VoiceCallCardPreview } from "@revolt/ui/components/features/voice/callCard/VoiceCallCardPreview";
+import { Symbol } from "@revolt/ui/components/utils/Symbol";
 import { MessageComposition } from "./Composition";
 import { MemberSidebar } from "./MemberSidebar";
 import { TextSearchSidebar } from "./TextSearchSidebar";
@@ -56,6 +63,7 @@ export type SidebarState =
 export function TextChannel(props: ChannelPageProps) {
   const state = useState();
   const client = useClient();
+  const voice = useVoice();
 
   // Last unread message id
   const [lastId, setLastId] = createSignal<string>();
@@ -74,11 +82,35 @@ export function TextChannel(props: ChannelPageProps) {
     props.channel.isVoice && props.channel.havePermission("Connect");
 
   /**
-   * Voice channels always replace the messages area with the room view or the
-   * join-preview card — messages are never shown alongside voice UI.
-   * For non-voice channels, messages are always shown.
+   * View mode for voice channels:
+   * - "messages": show message list (default when clicking a voice channel)
+   * - "voiceroom": show the full-space voice room (after joining the call)
    */
-  const showMessages = () => !canConnect();
+  const [viewMode, setViewMode] = createSignal<VoiceViewMode>("messages");
+
+  // Reset viewMode to messages when switching channels
+  createEffect(
+    on(
+      () => props.channel.id,
+      () => setViewMode("messages"),
+    ),
+  );
+
+  /** Whether the user is currently in a voice call on THIS channel */
+  const isInCallHere = () => voice.channel()?.id === props.channel.id;
+
+  /**
+   * Messages are shown when:
+   * - It's a non-voice channel (always), OR
+   * - It's a voice channel and viewMode is "messages"
+   */
+  const showMessages = () => !canConnect() || viewMode() === "messages";
+
+  /**
+   * The channel header is hidden when the voice room is shown full-space,
+   * because VoiceRoomView has its own chat toggle in the top-right corner.
+   */
+  const showHeader = () => !canConnect() || viewMode() !== "voiceroom";
 
   // Get a reference to the message box's load latest function
   let jumpToBottomRef: ((nearby?: string) => void) | undefined;
@@ -163,40 +195,90 @@ export function TextChannel(props: ChannelPageProps) {
     ),
   );
 
+  // Close the member sidebar when entering the voice room view
+  createEffect(
+    on(
+      () => canConnect() && viewMode() === "voiceroom",
+      (isVoiceRoom) => {
+        if (isVoiceRoom) {
+          setSidebarState({ state: "default" });
+          state.layout.setSectionState(
+            LAYOUT_SECTIONS.MEMBER_SIDEBAR,
+            false,
+            true,
+          );
+        }
+      },
+    ),
+  );
+
   return (
     <>
-      <Header bottomBorder topBorder>
-        <ChannelHeader
-          channel={props.channel}
-          sidebarState={sidebarState}
-          setSidebarState={setSidebarState}
-        />
-      </Header>
+      {/* Header: hidden when the voice room view is active (it has its own toggle) */}
+      <Show when={showHeader()}>
+        <Header bottomBorder topBorder>
+          <ChannelHeader
+            channel={props.channel}
+            sidebarState={sidebarState}
+            setSidebarState={setSidebarState}
+          />
+          {/* Show a "switch to voice room" button when in message view during a call */}
+          <Show
+            when={canConnect() && isInCallHere() && viewMode() === "messages"}
+          >
+            <IconButton
+              size="sm"
+              variant="tonal"
+              onPress={() => setViewMode("voiceroom")}
+              use:floating={{
+                tooltip: {
+                  placement: "bottom",
+                  content: "Voice room",
+                },
+              }}
+            >
+              <Symbol>call</Symbol>
+            </IconButton>
+          </Show>
+        </Header>
+      </Show>
       <Content>
         <main class={main()}>
           {/*
-           * VoiceChannelCallCardMount renders in normal document flow:
-           * - Expanded (in call, not minimised): shows full-space VoiceRoomView
-           * - Call elsewhere: shows a join-preview card
-           * - No call / minimised: renders nothing (null)
-           * Messages are hidden while the room is expanded to avoid overlap.
+           * VoiceChannelCallCardMount: only renders the full-space VoiceRoomView
+           * when viewMode is "voiceroom" and the user is in a call on this channel.
+           * Auto-switching logic (join -> voiceroom, disconnect -> messages) is
+           * handled inside the mount component.
            */}
           <Show when={canConnect()}>
-            <VoiceChannelCallCardMount channel={props.channel} />
+            <VoiceChannelCallCardMount
+              channel={props.channel}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+            />
           </Show>
 
+          {/* Messages area: shown for text channels always, and for voice channels in messages view */}
           <Show when={showMessages()}>
-            <Show when={!canConnect()}>
-              <BelowFloatingHeader>
-                <div>
-                  <NewMessages
-                    lastId={lastId}
-                    jumpBack={() => navigate(lastId()!)}
-                    dismiss={() => setLastId()}
-                  />
-                </div>
-              </BelowFloatingHeader>
+            {/*
+             * Compact "Join voice channel" preview card shown at the top of
+             * the message area when viewing a voice channel but not in a call.
+             */}
+            <Show when={canConnect() && !isInCallHere()}>
+              <CompactPreviewWrapper>
+                <VoiceCallCardPreview channel={props.channel} compact />
+              </CompactPreviewWrapper>
             </Show>
+
+            <BelowFloatingHeader>
+              <div>
+                <NewMessages
+                  lastId={lastId}
+                  jumpBack={() => navigate(lastId()!)}
+                  dismiss={() => setLastId()}
+                />
+              </div>
+            </BelowFloatingHeader>
 
             <Messages
               channel={props.channel}
@@ -308,6 +390,18 @@ const Content = styled("div", {
     flexGrow: 1,
     minWidth: 0,
     minHeight: 0,
+  },
+});
+
+/**
+ * Wrapper for the compact "Join voice channel" preview card at the top of
+ * the message area in voice channels.
+ */
+const CompactPreviewWrapper = styled("div", {
+  base: {
+    padding: "var(--gap-md)",
+    paddingBottom: 0,
+    flexShrink: 0,
   },
 });
 

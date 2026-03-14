@@ -1,5 +1,14 @@
 import { Key } from "@solid-primitives/keyed";
-import { createEffect, createMemo, Match, on, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  Match,
+  on,
+  onCleanup,
+  Show,
+  Switch,
+} from "solid-js";
 import {
   isTrackReference,
   TrackLoop,
@@ -73,6 +82,13 @@ const View = styled("div", {
 
     display: "flex",
     flexDirection: "column",
+
+    // Subtle coloured glow emanating from behind the bottom toolbar
+    backgroundImage:
+      "radial-gradient(ellipse 60% 80px at 50% 100%, color-mix(in srgb, var(--md-sys-color-primary) 25%, transparent) 0%, transparent 100%)",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "bottom center",
+    backgroundSize: "100% 160px",
   },
 });
 
@@ -286,7 +302,11 @@ function UserTile(props: {
         thumbnail: props.isThumbnail,
       })}
       onClick={toggleFullscreen}
-      style={{ cursor: "pointer" }}
+      style={{
+        cursor: "pointer",
+        background: cardColorFor(participant.identity),
+        color: "white",
+      }}
       use:floating={{
         userCard: {
           user: user().user!,
@@ -386,6 +406,26 @@ function ScreenshareTile(props: {
 
   let videoRef: HTMLDivElement | undefined;
 
+  // Track the source video's native aspect ratio so the focused tile can
+  // size itself to match the stream rather than stretching to fill.
+  const [aspectRatio, setAspectRatio] = createSignal<string | undefined>();
+
+  createEffect(() => {
+    if (!isFocusedHere() || !isWatched() || !videoRef) return;
+    const video = videoRef.querySelector("video");
+    if (!video) return;
+
+    const updateAR = () => {
+      if (video.videoWidth && video.videoHeight) {
+        setAspectRatio(`${video.videoWidth}/${video.videoHeight}`);
+      }
+    };
+
+    video.addEventListener("resize", updateAR);
+    updateAR(); // check if dimensions are already available
+    onCleanup(() => video.removeEventListener("resize", updateAR));
+  });
+
   function handleClick() {
     const id = trackId();
     if (isFocusedHere()) {
@@ -435,6 +475,9 @@ function ScreenshareTile(props: {
           isWatched() || props.isThumbnail || isFocusedHere()
             ? "pointer"
             : "default",
+        ...(isFocusedHere() && aspectRatio()
+          ? { "aspect-ratio": aspectRatio() }
+          : {}),
       }}
       use:floating={{
         contextMenu: () => <ScreenShareContextMenu userId={userId()} />,
@@ -543,6 +586,32 @@ function ScreenShareContextMenu(props: { userId: string }) {
   );
 }
 
+// ── Color palette for user card backgrounds ──────────────────────────────────
+
+const CARD_COLORS = [
+  "#2D5A7B", // deep blue
+  "#6B3A6B", // plum
+  "#2B6E4F", // forest green
+  "#7B4A3D", // burnt sienna
+  "#4A4A8A", // muted indigo
+  "#6B5B3E", // dark gold
+  "#3D6B6B", // teal
+  "#8B4560", // berry
+  "#4E6B3A", // olive
+  "#5A4A7B", // deep purple
+  "#7B5E3A", // bronze
+  "#3A5E6B", // slate blue
+];
+
+/** Deterministic card colour for a given user identity string. */
+function cardColorFor(identity: string): string {
+  let hash = 0;
+  for (let i = 0; i < identity.length; i++) {
+    hash = ((hash << 5) - hash + identity.charCodeAt(i)) | 0;
+  }
+  return CARD_COLORS[Math.abs(hash) % CARD_COLORS.length];
+}
+
 // ── Styled components ─────────────────────────────────────────────────────────
 
 const tile = cva({
@@ -569,9 +638,8 @@ const tile = cva({
     },
     focused: {
       true: {
-        width: "100%",
-        height: "100%",
-        aspectRatio: "auto",
+        maxWidth: "100%",
+        maxHeight: "100%",
       },
     },
     thumbnail: {

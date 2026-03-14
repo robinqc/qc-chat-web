@@ -10,10 +10,19 @@ import { Avatar, Ripple, Text } from "@revolt/ui/components/design";
 import { Row } from "@revolt/ui/components/layout";
 import { Symbol } from "@revolt/ui/components/utils/Symbol";
 
+interface VoiceCallCardPreviewProps {
+  channel: Channel;
+  /**
+   * When true, renders as a compact card suitable for floating above the
+   * message list instead of filling the entire content area.
+   */
+  compact?: boolean;
+}
+
 /**
  * Call card (preview)
  */
-export function VoiceCallCardPreview(props: { channel: Channel }) {
+export function VoiceCallCardPreview(props: VoiceCallCardPreviewProps) {
   const voice = useVoice();
   const { t } = useLingui();
 
@@ -29,7 +38,10 @@ export function VoiceCallCardPreview(props: { channel: Channel }) {
   }
 
   return (
-    <Preview onClick={() => voice.connect(props.channel)}>
+    <Preview
+      compact={props.compact}
+      onClick={() => voice.connect(props.channel)}
+    >
       <Ripple />
       <Row>
         <For each={users()} fallback={<Symbol size={24}>voice_chat</Symbol>}>
@@ -65,5 +77,23 @@ const Preview = styled("div", {
     padding: "var(--gap-lg)",
 
     color: "var(--md-sys-color-on-surface)",
+
+    cursor: "pointer",
+  },
+  variants: {
+    compact: {
+      true: {
+        height: "auto",
+        padding: "var(--gap-md)",
+        background:
+          "color-mix(in srgb, var(--md-sys-color-surface-container) 80%, transparent)",
+        border:
+          "1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent)",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: "var(--gap-md)",
+        flexShrink: 0,
+      },
+    },
   },
 });
