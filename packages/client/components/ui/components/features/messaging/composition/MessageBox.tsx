@@ -99,6 +99,7 @@ const Base = styled("div", {
     paddingInlineEnd: "var(--gap-md)",
     paddingBlock: "var(--gap-sm)",
     borderRadius: "var(--borderRadius-xl)",
+    border:"1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent)",
 
     display: "flex",
     background:
