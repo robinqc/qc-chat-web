@@ -267,7 +267,6 @@ const ActionsOverlay = styled("div", {
     display: "flex",
     justifyContent: "center",
     padding: "var(--gap-sm)",
-    background: "linear-gradient(transparent, rgba(0,0,0,0.5))",
     zIndex: 1,
     pointerEvents: "all",
   },

@@ -222,24 +222,6 @@ export function TextChannel(props: ChannelPageProps) {
             sidebarState={sidebarState}
             setSidebarState={setSidebarState}
           />
-          {/* Show a "switch to voice room" button when in message view during a call */}
-          <Show
-            when={canConnect() && isInCallHere() && viewMode() === "messages"}
-          >
-            <IconButton
-              size="sm"
-              variant="tonal"
-              onPress={() => setViewMode("voiceroom")}
-              use:floating={{
-                tooltip: {
-                  placement: "bottom",
-                  content: "Voice room",
-                },
-              }}
-            >
-              <Symbol>call</Symbol>
-            </IconButton>
-          </Show>
         </Header>
       </Show>
       <Content>

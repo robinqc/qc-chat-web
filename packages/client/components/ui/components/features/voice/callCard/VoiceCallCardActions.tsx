@@ -174,7 +174,7 @@ const Actions = styled("div", {
     borderRadius: "var(--borderRadius-full)",
 
     // Acrylic / frosted-glass effect
-    background: "rgba(255, 255, 255, 0.08)",
+    background: "rgba(0, 0, 0, 0.5)",
     backdropFilter: "blur(24px)",
     WebkitBackdropFilter: "blur(24px)",
     border: "1px solid rgba(255, 255, 255, 0.12)",
