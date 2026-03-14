@@ -9,7 +9,7 @@ import {
 } from "solid-js";
 import { RoomContext } from "solid-livekit-components";
 
-import { Room } from "livekit-client";
+import { Room, RoomEvent } from "livekit-client";
 import { DenoiseTrackProcessor } from "livekit-rnnoise-processor";
 import { Channel } from "stoat.js";
 
@@ -111,6 +111,7 @@ class Voice {
 
     room.addListener("connected", () => {
       this.#setState("CONNECTED");
+      new Audio(`${import.meta.env.BASE_URL}assets/sounds/connect.mp3`).play();
       if (this.speakingPermission)
         room.localParticipant.setMicrophoneEnabled(true).then((track) => {
           this.#setMicrophone(typeof track !== "undefined");
@@ -126,6 +127,22 @@ class Voice {
 
     room.addListener("disconnected", () => this.#setState("DISCONNECTED"));
 
+    room.addListener(RoomEvent.ParticipantConnected, () => {
+      if (!this.deafen()) {
+        new Audio(
+          `${import.meta.env.BASE_URL}assets/sounds/connect.mp3`,
+        ).play();
+      }
+    });
+
+    room.addListener(RoomEvent.ParticipantDisconnected, () => {
+      if (!this.deafen()) {
+        new Audio(
+          `${import.meta.env.BASE_URL}assets/sounds/disconnect.mp3`,
+        ).play();
+      }
+    });
+
     if (!auth) {
       auth = await channel.joinCall("worldwide");
     }
@@ -138,6 +155,8 @@ class Voice {
   disconnect() {
     const room = this.room();
     if (!room) return;
+
+    new Audio(`${import.meta.env.BASE_URL}assets/sounds/disconnect.mp3`).play();
 
     room.removeAllListeners();
     room.disconnect();

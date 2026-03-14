@@ -157,7 +157,7 @@ export function NotificationsWorker() {
       body = t`Sent ${message.attachments!.length} attachments`;
     }
 
-    // todo: play sound
+    new Audio(`${import.meta.env.BASE_URL}assets/sounds/message.mp3`).play();
 
     // Don't continue if we don't have notification permissions
     if (Notification.permission !== "granted") return;
